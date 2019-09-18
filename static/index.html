@@ -1,0 +1,268 @@
+<!--
+Copyright 2019 Michael Lodato <zvxryb@gmail.com>
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+-->
+<html>
+    <head>
+        <meta content="text/html;charset=utf-8" http-equiv="Content-Type"/>
+        <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.10.2/css/fontawesome.min.css' integrity='sha256-0mlw4Ae1j9eDzZTzLuw5X9fBCL9nAehrtVyKfIstZQA=' crossorigin='anonymous'></link>
+        <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.10.2/css/solid.min.css' integrity='sha256-xlh4aT8Ni/MnbIvFWbnIrJ+YKe+1S/y1xNQl7YWArXc=' crossorigin='anonymous'></link>
+        <style>
+            @import url('https://fonts.googleapis.com/css?family=Inconsolata|Montserrat&display=swap');
+            .strafe_hidden {
+                display: none !important;
+            }
+            #strafe_root {
+                position: absolute;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                right: 0;
+                font-family: 'Montserrat', sans-serif;
+                font-size: 16pt;
+                color: lightblue;
+            }
+            #strafe_canvas {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+            }
+            #strafe_overlay {
+                position: absolute;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                right: 0;
+                pointer-events: none;
+            }
+            #strafe_menu {
+                position: absolute;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                right: 0;
+
+                background-color: #000000c0;
+                color: lightblue;
+
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+            }
+            #strafe_menu table {
+                border-collapse: collapse;
+                color: lightblue;
+                width: 100%;
+                font-size: 12pt;
+                font-family: 'Montserrat', sans-serif;
+                font-variant: small-caps;
+            }
+            #strafe_menu td {
+                border-top-style: none;
+                border-bottom-style: solid;
+                border-bottom-color: lightblue;
+                border-bottom-width: 1px;
+                border-left-style: none;
+                border-right-style: none;
+            }
+            #strafe_menu h1 {
+                font-size: 48pt;
+                font-variant: small-caps;
+            }
+            #strafe_menu h2 {
+                font-size: 30pt;
+                font-variant: small-caps;
+            }
+            #strafe_menu button {
+                padding-top: 0.2em;
+                padding-bottom: 0.0em;
+                padding-left: 0.5em;
+                padding-right: 0.5em;
+                background-color: transparent;
+                color: lightblue;
+                border-top-style: none;
+                border-bottom-style: solid;
+                border-bottom-color: lightblue;
+                border-bottom-width: 1px;
+                border-left-style: none;
+                border-right-style: none;
+                width: 6em;
+                text-align: left;
+                font-size: 24pt;
+                font-family: 'Montserrat', sans-serif;
+                font-variant: small-caps;
+            }
+            #strafe_menu button:hover {
+                color: white;
+                border-bottom-color: white;
+            }
+            #strafe_menu input {
+                margin: 0;
+                padding: 0;
+                width: 100%;
+                border: none;
+                background-color: transparent;
+                color: lightblue;
+                text-align: right;
+                font-family: 'Inconsolata', monospace;
+            }
+            #strafe_movement {
+                text-align: center;
+            }
+            #strafe_move_presets {
+                margin-bottom: 0.5em;
+            }
+            #strafe_move_presets button {
+                position: relative;
+                font-size: 18pt;
+            }
+            #strafe_move_presets button:hover::before {
+                content: attr(data-tooltip);
+                position: absolute;
+                padding: 0.5em;
+                width: 20em;
+                bottom: 0;
+                left: 50%;
+                transform: translate(-50%, 100%);
+                background-color: #000000f0;
+                color: lightblue;
+                font-size: 12pt;
+            }
+            #strafe_keys {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, 100%);
+            }
+            #strafe_framerate {
+                position: absolute;
+                top: 1em;
+                right: 1em;
+                font-family: 'Inconsolata', monospace;
+                text-align: right;
+            }
+            #strafe_speedometer {
+                position: absolute;
+                bottom: 1em;
+                right: 1em;
+                font-family: 'Inconsolata', monospace;
+                font-size: 36pt;
+                text-align: right;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="strafe_root">
+            <canvas id="strafe_canvas"></canvas>
+            <div id="strafe_overlay">
+                <table id="strafe_keys" class="strafe_hidden">
+                    <tbody>
+                        <tr>
+                            <td></td>
+                            <td><i id="strafe_key_forward" class="fas fa-caret-square-up fa-5x"></i></td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                            <td><i id="strafe_key_left" class="fas fa-caret-square-left fa-5x"></i></td>
+                            <td><i id="strafe_key_back" class="fas fa-caret-square-down fa-5x"></i></td>
+                            <td><i id="strafe_key_right" class="fas fa-caret-square-right fa-5x"></i></td>
+                            <td><i id="strafe_key_space" class="fas fa-square fa-5x"></i></td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div id="strafe_framerate"></div>
+                <div id="strafe_speedometer">
+                    <span id="strafe_speed_ups"></span><br/>
+                    <span id="strafe_speed_mph"></span><br/>
+                    <span id="strafe_speed_kph"></span>
+                </div>
+            </div>
+            <div id="strafe_menu">
+                <h1>Strafe Jump Trainer 2019</h1>
+                <button id="strafe_menu_continue" class="strafe_hidden" type="button">Continue</button>
+                <button id="strafe_menu_tutorial" type="button">Tutorial</button>
+                <button id="strafe_menu_practice" type="button">Practice</button>
+                <div id="strafe_movement">
+                    <h2>Movement</h2>
+                    <div id="strafe_move_presets">
+                        <button id="strafe_move_vq3-like" type="button" data-tooltip="Moderate acceleration in a gradual arc; high top speed">Vanilla</button>
+                        <button id="strafe_move_qw-like" type="button" data-tooltip="Rapid acceleration and quick, sharp turns; low top speed">Old-Timey</button>
+                        <button id="strafe_move_hybrid" type="button" data-tooltip="Anisotropic hybrid mode; strafe with left- or right-only to make sharp turns">Hybrid</button>
+                    </div>
+                    <table>
+                        <tbody>
+                            <tr>
+                                <td colspan="3">Gravity</td>
+                                <td><input id="strafe_move_gravity" type="number" min="250" max="5000"></td>
+                            </tr>
+                            <tr>
+                                <td colspan="3">Jump Impulse</td>
+                                <td><input id="strafe_move_jump_impulse" type="number" min="50" max="1000"></td>
+                            </tr>
+                            <tr>
+                                <td colspan="3">Stall Speed</td>
+                                <td><input id="strafe_move_stall_speed" type="number" min="10" max="1000"></td>
+                            </tr>
+                            <tr>
+                                <td colspan="3">Friction</td>
+                                <td><input id="strafe_move_friction" type="number" min="1" max="100"></td>
+                            </tr>
+                            <tr>
+                                <td colspan="2" rowspan="2">Ground</td>
+                                <td>Max Speed</td>
+                                <td><input id="strafe_move_ground_speed" type="number" min="10" max="1000"></td>
+                            </tr>
+                            <tr>
+                                <td>Acceleration</td>
+                                <td><input id="strafe_move_ground_accel" type="number" min="100" max="10000"></td>
+                            </tr>
+                            <tr>
+                                <td colspan="2" rowspan="2">Air</td>
+                                <td>Max Speed</td>
+                                <td><input id="strafe_move_air_speed" type="number" min="10" max="1000"></td>
+                            </tr>
+                            <tr>
+                                <td>Acceleration</td>
+                                <td><input id="strafe_move_air_accel" type="number" min="100" max="10000"></td>
+                            </tr>
+                            <tr>
+                                <td rowspan="2">Air (turning)</td>
+                                <td rowspan="2"><input id="strafe_move_turn_enabled" type="checkbox"></td>
+                                <td>Max Speed</td>
+                                <td><input id="strafe_move_turn_speed" type="number" min="10" max="1000"></td>
+                            </tr>
+                            <tr>
+                                <td>Acceleration</td>
+                                <td><input id="strafe_move_turn_accel" type="number" min="100" max="10000"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <script src="./pkg/strafe_tutorial.js"></script>
+        <script>
+            async function main() {
+                await wasm_bindgen('./pkg/strafe_tutorial_bg.wasm')
+                wasm_bindgen.strafe_main()
+            }
+            main()
+        </script>
+    </body>
+</html>
