@@ -751,12 +751,8 @@ impl Application {
                 if keys_pressed.key_f {
                     strafe_bot.take_off();
                 }
-                let pos_x = self.player_state.pos.x + self.player_state.vel.x * self.tick_remainder_s;
-                let (mut theta, mut phi) = self.player_state.dir;
-                theta += self.input_rotation.0;
-                phi   += self.input_rotation.1;
                 let (keys, theta, phi) = strafe_bot.sim(frame_duration_s,
-                    velocity_xy, max_speed, pos_x, theta, phi, self.player_state.is_grounded());
+                    &self.player_state, &self.key_state, max_speed, self.input_rotation.0, self.input_rotation.1);
                 self.key_state.key_w = keys.key_w;
                 self.key_state.key_a = keys.key_a;
                 self.key_state.key_s = keys.key_s;

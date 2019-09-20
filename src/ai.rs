@@ -16,15 +16,16 @@
  */
 
 use crate::input::KeyState;
+use crate::player::PlayerState;
 
 use cgmath::prelude::*;
 
-use cgmath::{Basis2, Deg, Rad, Vector2};
+use cgmath::{Deg, Rad, Vector2};
 
 const CJ_START_X: f32 = -160.0;
 const CJ_ANGLE: Deg<f32> = Deg(150.0);
 
-const MAX_TURN_RATE: Deg<f32> = Deg(1000.0);
+const MAX_TURN_RATE: Deg<f32> = Deg(300.0);
 
 enum StrafeBotState {
     Idle,
@@ -38,6 +39,36 @@ pub struct StrafeConfig {
 }
 
 impl StrafeConfig {
+    fn keys_a() -> KeyState {
+        KeyState{
+            key_a: true,
+            ..Default::default()
+        }
+    }
+
+    fn keys_d() -> KeyState {
+        KeyState{
+            key_d: true,
+            ..Default::default()
+        }
+    }
+
+    fn keys_sa() -> KeyState {
+        KeyState{
+            key_s: true,
+            key_a: true,
+            ..Default::default()
+        }
+    }
+
+    fn keys_sd() -> KeyState {
+        KeyState{
+            key_s: true,
+            key_d: true,
+            ..Default::default()
+        }
+    }
+
     fn keys_wa() -> KeyState {
         KeyState{
             key_w: true,
@@ -58,6 +89,27 @@ impl StrafeConfig {
         Self{
             keys_cw : Self::keys_wd(),
             keys_ccw: Self::keys_wa(),
+        }
+    }
+
+    pub fn full_beat_reverse() -> Self {
+        Self{
+            keys_cw : Self::keys_sa(),
+            keys_ccw: Self::keys_sd(),
+        }
+    }
+
+    pub fn half_beat_left() -> Self {
+        Self{
+            keys_cw : Self::keys_d(),
+            keys_ccw: Self::keys_wa(),
+        }
+    }
+
+    pub fn half_beat_right() -> Self {
+        Self{
+            keys_cw : Self::keys_wd(),
+            keys_ccw: Self::keys_a(),
         }
     }
 }
@@ -82,7 +134,7 @@ impl StrafeBot {
     pub fn new() -> Self {
         Self{
             state: StrafeBotState::Idle,
-            config: StrafeConfig::full_beat(),
+            config: StrafeConfig::full_beat_reverse(),
         }
     }
 
@@ -112,83 +164,81 @@ impl StrafeBot {
     }
 
     pub fn sim(&mut self, dt: f32,
-        vel: Vector2<f32>,
+        player: &PlayerState,
+        keys: &KeyState,
         speed_limit: f32,
-        x: f32,
-        theta: Rad<f32>,
-        phi: Rad<f32>,
-        is_grounded: bool,
+        add_yaw: Rad<f32>,
+        add_pitch: Rad<f32>,
     )
         -> (KeyState, Rad<f32>, Rad<f32>)
     {
+        let yaw   = player.dir.0 + add_yaw;
+        let pitch = player.dir.1 + add_pitch;
+        let input_angle: Rad<f32> = Vector2::unit_y().angle(player.wish_dir(keys, add_yaw, add_pitch).xy());
         let max_turn: Rad<f32> = (MAX_TURN_RATE * dt).into();
-        let (keys, turn_theta) = loop { match &mut self.state {
+        let (out_keys, turn_yaw) = loop { match &mut self.state {
             StrafeBotState::Idle => {
                 let target_angle = -CJ_ANGLE;
-                let move_x = CJ_START_X - x;
+                let move_x = CJ_START_X - player.pos.x;
                 let should_move = move_x.abs() > 10.0;
                 let move_angle: Rad<f32> = if move_x > 0.0 {
                     Rad::zero()
                 } else {
                     Rad::turn_div_2()
                 };
-                let (ny, nx) = (move_angle - theta).sin_cos();
+                let (ny, nx) = (move_angle - yaw).sin_cos();
                 const MOVE_THRESHOLD: f32 = 0.383;
-                let keys = KeyState{
+                let out_keys = KeyState{
                     key_w: should_move && ny >  MOVE_THRESHOLD,
                     key_a: should_move && nx < -MOVE_THRESHOLD,
                     key_s: should_move && ny < -MOVE_THRESHOLD,
                     key_d: should_move && nx >  MOVE_THRESHOLD,
                     ..Default::default()
                 };
-                break (keys, Into::<Rad<_>>::into(target_angle) - theta);
+                break (out_keys, Into::<Rad<_>>::into(target_angle) - yaw);
             },
             StrafeBotState::Takeoff(turned) => {
                 if *turned >= CJ_ANGLE {
                     self.state = StrafeBotState::Flight(false, false);
                     continue;
                 }
-                let speed = vel.magnitude();
+                let speed = player.vel.magnitude();
                 let cj_started = speed > 0.99 * speed_limit;
-                let keys = KeyState{
+                let out_keys = KeyState{
                     key_w: true,
                     key_a: cj_started,
                     ..Default::default()
                 };
-                let input_angle: Rad<f32> = (if cj_started {
-                    Deg(45.0).into()
-                } else {
-                    Rad::zero()
-                }) + theta;
                 let turn_angle = Self::strafe_turning(dt,
-                    Vector2::unit_y().angle(vel),
+                    Vector2::unit_y().angle(player.vel.xy()),
                     input_angle,
                     speed / speed_limit,
                     Rad(10.0),
                     false);
                 *turned += clamp_angle(turn_angle, max_turn).into();
-                break (keys, turn_angle);
+                break (out_keys, turn_angle);
             }
             StrafeBotState::Flight(jumped, is_clockwise) => {
-                let speed = vel.magnitude();
+                let speed = player.vel.magnitude();
                 if speed < speed_limit {
                     self.state = StrafeBotState::Idle;
                     continue;
                 }
+                let is_grounded = player.is_grounded();
                 if is_grounded {
                     if !*jumped {
                         *jumped = true;
-                        *is_clockwise = vel.x < 0.0;
-                        if x < -512.0 {
+                        *is_clockwise = player.vel.x < 0.0;
+                        if player.pos.x < -512.0 {
                             *is_clockwise = true;
-                        } else if x > 512.0 {
+                        } else if player.pos.x > 512.0 {
                             *is_clockwise = false;
                         }
                     }
                 } else {
                     *jumped = false;
                 }
-                let keys = KeyState{
+                let out_keys = KeyState{
                     space: is_grounded,
                     ..Default::default()
                 } | (if *is_clockwise {
@@ -196,24 +246,18 @@ impl StrafeBot {
                 } else {
                     self.config.keys_ccw
                 });
-                let input_angle: Rad<f32> = Into::<Rad<_>>::into(
-                    if *is_clockwise {
-                        Deg(-45.0)
-                    } else {
-                        Deg(45.0)
-                    }) + theta;
                 let turn_angle = Self::strafe_turning(dt,
-                    Vector2::unit_y().angle(vel),
+                    Vector2::unit_y().angle(player.vel.xy()),
                     input_angle,
                     speed / speed_limit,
                     Rad(2.0),
                     *is_clockwise);
-                break (keys, turn_angle);
+                break (out_keys, turn_angle);
             }
         }};
-        let turn_phi = Into::<Rad<_>>::into(Deg(90.0)) - phi;
-        (keys,
-            clamp_angle(turn_theta, max_turn),
-            clamp_angle(turn_phi  , max_turn))
+        let turn_pitch = Into::<Rad<_>>::into(Deg(90.0)) - pitch;
+        (out_keys,
+            clamp_angle(turn_yaw  , max_turn),
+            clamp_angle(turn_pitch, max_turn))
     }
 }
