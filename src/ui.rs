@@ -18,6 +18,7 @@
 use wasm_bindgen::JsCast;
 use web_sys::{
     Document,
+    Element,
     HtmlButtonElement,
     HtmlCanvasElement,
     HtmlDivElement,
@@ -32,10 +33,11 @@ pub struct UI {
     pub document: Document,
     pub root_node: HtmlDivElement,
     pub canvas: HtmlCanvasElement,
-    pub key_forward: HtmlElement,
-    pub key_back: HtmlElement,
-    pub key_left: HtmlElement,
-    pub key_right: HtmlElement,
+    pub key_forward: Element,
+    pub key_back: Element,
+    pub key_left: Element,
+    pub key_right: Element,
+    pub key_jump: Element,
     pub framerate: HtmlElement,
     pub speed_ups: HtmlElement,
     pub speed_mph: HtmlElement,
@@ -76,10 +78,11 @@ pub fn get_ui() -> UI {
 
     let root_node         = get_as::<HtmlDivElement   >(&document, "strafe_root");
     let canvas            = get_as::<HtmlCanvasElement>(&document, "strafe_canvas");
-    let key_forward       = get_as::<HtmlElement      >(&document, "strafe_key_forward");
-    let key_back          = get_as::<HtmlElement      >(&document, "strafe_key_back");
-    let key_left          = get_as::<HtmlElement      >(&document, "strafe_key_left");
-    let key_right         = get_as::<HtmlElement      >(&document, "strafe_key_right");
+    let key_forward       = get_as::<Element          >(&document, "strafe_key_forward");
+    let key_back          = get_as::<Element          >(&document, "strafe_key_back");
+    let key_left          = get_as::<Element          >(&document, "strafe_key_left");
+    let key_right         = get_as::<Element          >(&document, "strafe_key_right");
+    let key_jump          = get_as::<Element          >(&document, "strafe_key_jump");
     let framerate         = get_as::<HtmlElement      >(&document, "strafe_framerate");
     let speed_ups         = get_as::<HtmlElement      >(&document, "strafe_speed_ups");
     let speed_mph         = get_as::<HtmlElement      >(&document, "strafe_speed_mph");
@@ -112,6 +115,7 @@ pub fn get_ui() -> UI {
         key_back,
         key_left,
         key_right,
+        key_jump,
         framerate,
         speed_ups,
         speed_mph,

@@ -134,7 +134,7 @@ impl StrafeBot {
     pub fn new() -> Self {
         Self{
             state: StrafeBotState::Idle,
-            config: StrafeConfig::full_beat_reverse(),
+            config: StrafeConfig::full_beat(),
         }
     }
 

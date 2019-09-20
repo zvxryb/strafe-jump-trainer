@@ -149,6 +149,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
                 left: 50%;
                 transform: translate(-50%, 100%);
             }
+            #strafe_keys .strafe_highlight {
+                color: #ff0000ff;
+            }
             #strafe_framerate {
                 position: absolute;
                 top: 1em;
@@ -170,7 +173,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
         <div id="strafe_root">
             <canvas id="strafe_canvas"></canvas>
             <div id="strafe_overlay">
-                <table id="strafe_keys" class="strafe_hidden">
+                <table id="strafe_keys">
                     <tbody>
                         <tr>
                             <td></td>
@@ -182,7 +185,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
                             <td><i id="strafe_key_left" class="fas fa-caret-square-left fa-5x"></i></td>
                             <td><i id="strafe_key_back" class="fas fa-caret-square-down fa-5x"></i></td>
                             <td><i id="strafe_key_right" class="fas fa-caret-square-right fa-5x"></i></td>
-                            <td><i id="strafe_key_space" class="fas fa-square fa-5x"></i></td>
+                            <td><i id="strafe_key_jump" class="fas fa-square fa-5x"></i></td>
                         </tr>
                     </tbody>
                 </table>

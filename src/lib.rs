@@ -111,6 +111,15 @@ fn hide(element: &Element) {
         .expect("failed to add strafe_hidden css class");
 }
 
+fn set_highlight(element: &Element, highlight: bool) {
+    let classes = element.class_list();
+    if highlight {
+        classes.add_1("strafe_highlight")
+    } else {
+        classes.remove_1("strafe_highlight")
+    }.expect("failed to add/remove strafe_highlight css class");
+}
+
 const MAIN_VS_SRC: &str = "#version 100
 
 attribute vec3 pos;
@@ -244,6 +253,7 @@ struct Application {
     mouse_scale: Rad<f32>,
     key_state: KeyState,
     key_history: KeyState,
+    bot_key_history: KeyState,
     last_frame_us: u32,
     tick_remainder_s: f32,
     framerate: f32,
@@ -309,6 +319,7 @@ impl Application {
             mouse_scale: Rad(0.001),
             key_state: KeyState::default(),
             key_history: KeyState::default(),
+            bot_key_history: KeyState::default(),
             last_frame_us: 0,
             tick_remainder_s: 0.0,
             framerate: 0.0,
@@ -753,6 +764,22 @@ impl Application {
                 }
                 let (keys, theta, phi) = strafe_bot.sim(frame_duration_s,
                     &self.player_state, &self.key_state, max_speed, self.input_rotation.0, self.input_rotation.1);
+                let bot_keys_pressed  =  keys & !self.bot_key_history;
+                let bot_keys_released = !keys &  self.bot_key_history;
+                self.bot_key_history = keys;
+
+                if bot_keys_pressed.key_w { set_highlight(&self.ui.key_forward, true); }
+                if bot_keys_pressed.key_a { set_highlight(&self.ui.key_left   , true); }
+                if bot_keys_pressed.key_s { set_highlight(&self.ui.key_back   , true); }
+                if bot_keys_pressed.key_d { set_highlight(&self.ui.key_right  , true); }
+                if bot_keys_pressed.space { set_highlight(&self.ui.key_jump   , true); }
+
+                if bot_keys_released.key_w { set_highlight(&self.ui.key_forward, false); }
+                if bot_keys_released.key_a { set_highlight(&self.ui.key_left   , false); }
+                if bot_keys_released.key_s { set_highlight(&self.ui.key_back   , false); }
+                if bot_keys_released.key_d { set_highlight(&self.ui.key_right  , false); }
+                if bot_keys_released.space { set_highlight(&self.ui.key_jump   , false); }
+
                 self.key_state.key_w = keys.key_w;
                 self.key_state.key_a = keys.key_a;
                 self.key_state.key_s = keys.key_s;
