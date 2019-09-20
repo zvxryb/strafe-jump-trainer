@@ -28,7 +28,7 @@ use cgmath::{
     Vector3,
 };
 
-use crate::KeyState;
+use crate::input::KeyState;
 
 pub const PLAYER_EYELEVEL: f32 = 64.0;
 pub const PLAYER_RADIUS: f32 = 16.0;

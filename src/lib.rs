@@ -55,9 +55,12 @@ extern {
 mod env;
 mod gl_context;
 mod gfx;
+mod input;
 mod player;
+mod ai;
 mod ui;
 
+use ai::StrafeBot;
 use env::{Environment, Runway};
 use gl_context::AnyGlContext;
 use gfx::{
@@ -68,6 +71,7 @@ use gfx::{
     UniformValue,
     WarpEffect,
 };
+use input::KeyState;
 use player::{
     Kinematics,
     Movement,
@@ -226,21 +230,6 @@ void main() {
 }
 ";
 
-pub struct KeyState {
-    key_w: bool,
-    key_a: bool,
-    key_s: bool,
-    key_d: bool,
-    space: bool,
-}
-
-impl KeyState {
-    fn is_side_strafe(&self) -> bool {
-         (self.key_a || self.key_d) &&
-        !(self.key_w || self.key_s)
-    }
-}
-
 struct Application {
     ui: UI,
     gl: AnyGlContext,
@@ -248,11 +237,13 @@ struct Application {
     perspective: PerspectiveFov::<f32>,
     player_state: PlayerState,
     kinematics: Kinematics,
+    strafe_bot: Option<StrafeBot>,
     menu_shown: bool,
     have_pointer: bool,
     input_rotation: (Rad<f32>, Rad<f32>),
     mouse_scale: Rad<f32>,
     key_state: KeyState,
+    key_history: KeyState,
     last_frame_us: u32,
     tick_remainder_s: f32,
     framerate: f32,
@@ -286,7 +277,7 @@ impl Application {
             None
         };
 
-        let environment = Box::new(Runway::from_dimensions(gl.gl(), 16384.0, 1024.0)
+        let environment = Box::new(Runway::from_dimensions(gl.gl(), 16384.0, 2048.0)
             .expect("failed to create environment"));
 
         let main_program = Program::from_source(gl.gl(), MAIN_VS_SRC, MAIN_FS_SRC)
@@ -311,17 +302,13 @@ impl Application {
             },
             player_state: PlayerState::default(),
             kinematics: MOVE_VQ3_LIKE,
+            strafe_bot: None,
             menu_shown: true,
             have_pointer: false,
             input_rotation: (Rad::zero(), Rad::zero()),
             mouse_scale: Rad(0.001),
-            key_state: KeyState{
-                key_w: false,
-                key_a: false,
-                key_s: false,
-                key_d: false,
-                space: false,
-            },
+            key_state: KeyState::default(),
+            key_history: KeyState::default(),
             last_frame_us: 0,
             tick_remainder_s: 0.0,
             framerate: 0.0,
@@ -503,6 +490,7 @@ impl Application {
                     "KeyA" => key_state.key_a = true,
                     "KeyS" => key_state.key_s = true,
                     "KeyD" => key_state.key_d = true,
+                    "KeyF" => key_state.key_f = true,
                     "Space" => key_state.space = true,
                     _ => {},
                 }
@@ -518,6 +506,7 @@ impl Application {
                     "KeyA" => key_state.key_a = false,
                     "KeyS" => key_state.key_s = false,
                     "KeyD" => key_state.key_d = false,
+                    "KeyF" => key_state.key_f = false,
                     "Space" => key_state.space = false,
                     _ => {},
                 }
@@ -677,6 +666,9 @@ impl Application {
     }
 
     fn draw_frame(&mut self) {
+        let keys_pressed = self.key_state.rising_edge(self.key_history);
+        self.key_history = self.key_state;
+
         {
             let c = self.environment.atmosphere_color().to_srgb();
             self.gl.gl().clear_color(c.r, c.g, c.b, 1.0);
@@ -754,6 +746,29 @@ impl Application {
             ]);
 
             self.gl.gl().disable(WebGlRenderingContext::BLEND);
+
+            if let Some(strafe_bot) = &mut self.strafe_bot {
+                if keys_pressed.key_f {
+                    strafe_bot.take_off();
+                }
+                let pos_x = self.player_state.pos.x + self.player_state.vel.x * self.tick_remainder_s;
+                let (mut theta, mut phi) = self.player_state.dir;
+                theta += self.input_rotation.0;
+                phi   += self.input_rotation.1;
+                let (keys, theta, phi) = strafe_bot.sim(frame_duration_s,
+                    velocity_xy, max_speed, pos_x, theta, phi, self.player_state.is_grounded());
+                self.key_state.key_w = keys.key_w;
+                self.key_state.key_a = keys.key_a;
+                self.key_state.key_s = keys.key_s;
+                self.key_state.key_d = keys.key_d;
+                self.key_state.space = keys.space;
+                self.input_rotation.0 += theta;
+                self.input_rotation.1 += phi;
+            } else {
+                if keys_pressed.key_f {
+                    self.strafe_bot = Some(StrafeBot::new());
+                }
+            }
         }
 
         {
