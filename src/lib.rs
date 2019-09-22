@@ -92,13 +92,37 @@ const UNITS_PER_KM: f32 = 39370.1;
 const MPH_PER_UPS: f32 = 3600.0 / UNITS_PER_MILE;
 const KPH_PER_UPS: f32 = 3600.0 / UNITS_PER_KM;
 
+#[derive(Copy, Clone)]
+enum TimedStage {
+    Waiting(f32),
+    Done,
+}
+
+#[derive(Copy, Clone)]
+enum SpeedStage {
+    MaxSpeed(f32),
+    Done,
+}
+
+#[derive(Copy, Clone)]
 enum TutorialStage {
-    Intro,
-    Mouse,
-    Keyboard,
-    Hopping,
-    Moving,
-    Turning
+    Intro  (TimedStage),
+    Observe(TimedStage),
+    Hopping(SpeedStage),
+    Moving (SpeedStage),
+    Turning(SpeedStage),
+}
+
+impl TutorialStage {
+    fn next(&mut self) -> Option<Self> {
+        match self {
+            TutorialStage::Intro  (..) => Some(TutorialStage::Observe(TimedStage::Waiting (0.0))),
+            TutorialStage::Observe(..) => Some(TutorialStage::Hopping(SpeedStage::MaxSpeed(0.0))),
+            TutorialStage::Hopping(..) => Some(TutorialStage::Moving (SpeedStage::MaxSpeed(0.0))),
+            TutorialStage::Moving (..) => Some(TutorialStage::Turning(SpeedStage::MaxSpeed(0.0))),
+            TutorialStage::Turning(..) => None,
+        }
+    }
 }
 
 fn show(element: &Element) {
@@ -247,12 +271,17 @@ struct Application {
     player_state: PlayerState,
     kinematics: Kinematics,
     strafe_bot: Option<StrafeBot>,
+    auto_hop : bool,
+    auto_move: bool,
+    auto_turn: bool,
     menu_shown: bool,
     have_pointer: bool,
     input_rotation: (Rad<f32>, Rad<f32>),
     mouse_scale: Rad<f32>,
-    key_state: KeyState,
-    key_history: KeyState,
+    key_state:       KeyState,
+    key_history:     KeyState,
+    input_key_state: KeyState,
+    bot_key_state:   KeyState,
     bot_key_history: KeyState,
     last_frame_us: u32,
     tick_remainder_s: f32,
@@ -312,13 +341,18 @@ impl Application {
             },
             player_state: PlayerState::default(),
             kinematics: MOVE_VQ3_LIKE,
-            strafe_bot: None,
+            strafe_bot: Some(StrafeBot::new()),
+            auto_hop : true,
+            auto_move: true,
+            auto_turn: true,
             menu_shown: true,
             have_pointer: false,
             input_rotation: (Rad::zero(), Rad::zero()),
             mouse_scale: Rad(0.001),
-            key_state: KeyState::default(),
-            key_history: KeyState::default(),
+            key_state:       KeyState::default(),
+            key_history:     KeyState::default(),
+            input_key_state: KeyState::default(),
+            bot_key_state:   KeyState::default(),
             bot_key_history: KeyState::default(),
             last_frame_us: 0,
             tick_remainder_s: 0.0,
@@ -337,18 +371,94 @@ impl Application {
 
     fn set_stage(&mut self, stage: Option<TutorialStage>) {
         self.stage = stage;
+        self.player_state.reset();
+        let dialog = &mut self.ui.dialog.dyn_ref::<web_sys::Node>().unwrap();
         match self.stage {
-            Some(_) => {
+            Some(stage) => {
+                match stage {
+                    TutorialStage::Intro(..) => {
+                        dialog.set_text_content(Some("\
+                            Welcome to Strafe Jump Trainer!\n\n\
+                            Strafe jumping is an advanced movement technique involving skillful, \
+                            coordinated motions to accelerate beyond typical in-game speed limits.  \
+                            Many first-person game engines share similar lineage and support some \
+                            variation of these techniques.  When the engine checks the players' \
+                            intended direction of motion against the current velocity, it creates an \
+                            effective \"dead zone\" \u{2014} a region where the player is not allowed \
+                            to continue acceleration.  If the player maintains a movement direction \
+                            which is just outside this region, acceleration is allowed to continue.\n\n\
+                            Still don't get it?  No problem, it just takes a bit of practice!"));
+                        self.strafe_bot = None;
+                        hide(&self.ui.keys);
+                    }
+                    TutorialStage::Observe(..) => {
+                        dialog.set_text_content(Some("\
+                            Meet Strafe Bot.\n\n\
+                            As Strafe Bot strafes, observe how he:\n\
+                            1. Begins with a rapid turn before his first jump to gain ground speed\n\
+                            2. Repeatedly jumps to maintain speed\n\
+                            3. Alternates between left-forward and right-forward motion keys\n\
+                            4. Keeps his cursor within the green part of the strafe HUD\n\n\
+                            When done correctly, the cursor lights up to indicate acceleration"));
+                        self.strafe_bot = Some(StrafeBot::new());
+                        self.auto_hop  = true;
+                        self.auto_move = true;
+                        self.auto_turn = true;
+                        show(&self.ui.keys);
+                    }
+                    TutorialStage::Hopping(..) => {
+                        dialog.set_text_content(Some("\
+                            We'll begin with hopping practice.  Strafe bot will continue to handle basic \
+                            motion, but you will have to press SPACE as indicated on the HUD.\n\n\
+                            Reach 1000 UPS to continue."));
+                        self.strafe_bot = Some(StrafeBot::new());
+                        self.auto_hop  = false;
+                        self.auto_move = true;
+                        self.auto_turn = true;
+                        show(&self.ui.keys);
+                    }
+                    TutorialStage::Moving(..) => {
+                        dialog.set_text_content(Some("\
+                            Next, let's practice movement keys.  This time you'll have control over \
+                            W/A/S/D, exclusively.  Follow along with the HUD indicators.\n\n\
+                            Reach 1000 UPS to continue."));
+                        self.strafe_bot = Some(StrafeBot::new());
+                        self.auto_hop  = true;
+                        self.auto_move = false;
+                        self.auto_turn = true;
+                        show(&self.ui.keys);
+                    }
+                    TutorialStage::Turning(..) => {
+                        dialog.set_text_content(Some("\
+                            Finally, mouse motion.  Begin with a quick turn to the left, then use gradual \
+                            motion to keep your cursor in the green area of the HUD, while Strafe Bot \
+                            handles movement.  Keep the cursor lit up for as much time as possible.\n\n\
+                            Reach 1000 UPS to continue."));
+                        self.strafe_bot = Some(StrafeBot::new());
+                        self.auto_hop  = true;
+                        self.auto_move = true;
+                        self.auto_turn = false;
+                        show(&self.ui.keys);
+                    }
+                };
                 show(self.ui.menu_continue.dyn_ref::<Element>().unwrap());
                 hide(self.ui.menu_tutorial.dyn_ref::<Element>().unwrap());
                 show(self.ui.menu_practice.dyn_ref::<Element>().unwrap());
+                hide(self.ui.menu_movement.dyn_ref::<Element>().unwrap());
             },
             None => {
+                dialog.set_text_content(None);
+                self.strafe_bot = Some(StrafeBot::new());
+                self.auto_hop  = false;
+                self.auto_move = false;
+                self.auto_turn = false;
                 show(self.ui.menu_continue.dyn_ref::<Element>().unwrap());
                 show(self.ui.menu_tutorial.dyn_ref::<Element>().unwrap());
                 hide(self.ui.menu_practice.dyn_ref::<Element>().unwrap());
+                show(self.ui.menu_movement.dyn_ref::<Element>().unwrap());
+                show(&self.ui.keys);
             },
-        }
+        };
     }
 
     fn show_menu(&mut self) {
@@ -495,7 +605,7 @@ impl Application {
         let key_down_cb = {
             let app = app.clone();
             Closure::wrap(Box::new(move |event: KeyboardEvent| {
-                let key_state = &mut app.borrow_mut().key_state;
+                let key_state = &mut app.borrow_mut().input_key_state;
                 match event.code().as_str() {
                     "KeyW" => key_state.key_w = true,
                     "KeyA" => key_state.key_a = true,
@@ -511,7 +621,7 @@ impl Application {
         let key_up_cb = {
             let app = app.clone();
             Closure::wrap(Box::new(move |event: KeyboardEvent| {
-                let key_state = &mut app.borrow_mut().key_state;
+                let key_state = &mut app.borrow_mut().input_key_state;
                 match event.code().as_str() {
                     "KeyW" => key_state.key_w = false,
                     "KeyA" => key_state.key_a = false,
@@ -566,7 +676,7 @@ impl Application {
             let app = app.clone();
             Closure::wrap(Box::new(move || {
                 let root_node = app.borrow().ui.root_node.clone();
-                app.borrow_mut().set_stage(Some(TutorialStage::Intro));
+                app.borrow_mut().set_stage(Some(TutorialStage::Intro(TimedStage::Waiting(0.0))));
                 app.borrow_mut().hide_menu();
                 let _ = root_node.request_fullscreen();
                 let _ = root_node.request_pointer_lock();
@@ -676,9 +786,93 @@ impl Application {
         self.tick_remainder_s -= dt;
     }
 
-    fn draw_frame(&mut self) {
-        let keys_pressed = self.key_state.rising_edge(self.key_history);
+    fn update_tutorial(&mut self, dt: f32, ground_speed: f32, action_pressed: bool) {
+        let next_stage = if let Some(stage) = &mut self.stage {
+            let (is_ready, was_ready) = match stage {
+                TutorialStage::Intro  (status) |
+                TutorialStage::Observe(status) =>
+                {
+                    let (is_ready, was_ready) = if let TimedStage::Waiting(time) = status {
+                        *time += dt;
+                        (*time > 5.0, false)
+                    } else {
+                        (true, true)
+                    };
+
+                    if is_ready && !was_ready {
+                        *status = TimedStage::Done;
+                    }
+
+                    (is_ready, was_ready)
+                }
+                TutorialStage::Hopping(status) |
+                TutorialStage::Moving (status) |
+                TutorialStage::Turning(status) =>
+                {
+                    let (is_ready, was_ready) = if let SpeedStage::MaxSpeed(speed) = status {
+                        *speed = speed.max(ground_speed);
+                        (*speed > 1000.0, false)
+                    } else {
+                        (true, true)
+                    };
+
+                    if is_ready && !was_ready {
+                        *status = SpeedStage::Done;
+                    }
+
+                    (is_ready, was_ready)
+                }
+            };
+
+            if is_ready && !was_ready {
+                let dialog = &mut self.ui.dialog.dyn_ref::<web_sys::Node>().unwrap();
+                let mut text = dialog.text_content().unwrap_or_default();
+                let prompt = if let TutorialStage::Turning(..) = stage {
+                    "\n\nPress \"F\" to conclude tutorial."
+                } else {
+                    "\n\nPress \"F\" to proceed."
+                };
+                text.push_str(prompt);
+                dialog.set_text_content(Some(text.as_str()));
+            }
+
+            if was_ready && action_pressed {
+                Some(stage.next())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        if let Some(next_stage) = next_stage {
+            self.set_stage(next_stage);
+        }
+    }
+
+    fn update_keys(&mut self) -> KeyState {
+        self.key_state = self.input_key_state;
+
+        if let Some(strafe_bot) = &self.strafe_bot {
+            if self.auto_move || strafe_bot.is_setting_up() {
+                self.key_state.key_w = self.bot_key_state.key_w;
+                self.key_state.key_a = self.bot_key_state.key_a;
+                self.key_state.key_s = self.bot_key_state.key_s;
+                self.key_state.key_d = self.bot_key_state.key_d;
+            }
+
+            if self.auto_hop {
+                self.key_state.space = self.bot_key_state.space;
+            }
+        }
+
+        let keys_pressed = self.key_state.pressed(self.key_history);
         self.key_history = self.key_state;
+        keys_pressed
+    }
+
+    fn draw_frame(&mut self) {
+        let keys_pressed = self.update_keys();
 
         {
             let c = self.environment.atmosphere_color().to_srgb();
@@ -727,6 +921,11 @@ impl Application {
             self.gl.gl().disable(WebGlRenderingContext::DEPTH_TEST);
         }
 
+        let is_jumping = self.key_state.space;
+        let is_grounded = self.player_state.is_grounded() && !is_jumping;
+        let is_turning = self.key_state.is_side_strafe();
+        let max_speed = self.kinematics.effective_movement(is_grounded, is_turning).max_speed;
+
         {
             let fovx = Rad::atan(self.perspective.aspect * (self.perspective.fovy / 2.0).tan()) * 2.0;
             let wish_dir = self.player_state.wish_dir(
@@ -736,10 +935,6 @@ impl Application {
             let velocity_xy = self.player_state.vel.xy();
             let speed = velocity_xy.magnitude();
             let move_dir = if speed > 0.0001 { velocity_xy / speed } else { Vector2::zero() };
-            let is_jumping = self.key_state.space;
-            let is_grounded = self.player_state.is_grounded() && !is_jumping;
-            let is_turning = self.key_state.is_side_strafe();
-            let max_speed = self.kinematics.effective_movement(is_grounded, is_turning).max_speed;
             let warp_factor = speed / max_speed;
 
             self.gl.gl().enable(WebGlRenderingContext::BLEND);
@@ -757,41 +952,38 @@ impl Application {
             ]);
 
             self.gl.gl().disable(WebGlRenderingContext::BLEND);
+        }
 
-            if let Some(strafe_bot) = &mut self.strafe_bot {
-                if keys_pressed.key_f {
-                    strafe_bot.take_off();
-                }
-                let (keys, theta, phi) = strafe_bot.sim(frame_duration_s,
-                    &self.player_state, &self.key_state, max_speed, self.input_rotation.0, self.input_rotation.1);
-                let bot_keys_pressed  =  keys & !self.bot_key_history;
-                let bot_keys_released = !keys &  self.bot_key_history;
-                self.bot_key_history = keys;
+        if let Some(strafe_bot) = &mut self.strafe_bot {
+            let (keys, theta, phi) = strafe_bot.sim(frame_duration_s,
+                &self.player_state, &self.key_state, max_speed, self.input_rotation.0, self.input_rotation.1);
+            self.bot_key_history = self.bot_key_state;
+            self.bot_key_state   = keys;
 
-                if bot_keys_pressed.key_w { set_highlight(&self.ui.key_forward, true); }
-                if bot_keys_pressed.key_a { set_highlight(&self.ui.key_left   , true); }
-                if bot_keys_pressed.key_s { set_highlight(&self.ui.key_back   , true); }
-                if bot_keys_pressed.key_d { set_highlight(&self.ui.key_right  , true); }
-                if bot_keys_pressed.space { set_highlight(&self.ui.key_jump   , true); }
+            let pressed  = self.bot_key_state.pressed (self.bot_key_history);
+            let released = self.bot_key_state.released(self.bot_key_history);
 
-                if bot_keys_released.key_w { set_highlight(&self.ui.key_forward, false); }
-                if bot_keys_released.key_a { set_highlight(&self.ui.key_left   , false); }
-                if bot_keys_released.key_s { set_highlight(&self.ui.key_back   , false); }
-                if bot_keys_released.key_d { set_highlight(&self.ui.key_right  , false); }
-                if bot_keys_released.space { set_highlight(&self.ui.key_jump   , false); }
+            if pressed.key_w { set_highlight(&self.ui.key_forward, true); }
+            if pressed.key_a { set_highlight(&self.ui.key_left   , true); }
+            if pressed.key_s { set_highlight(&self.ui.key_back   , true); }
+            if pressed.key_d { set_highlight(&self.ui.key_right  , true); }
+            if pressed.space { set_highlight(&self.ui.key_jump   , true); }
 
-                self.key_state.key_w = keys.key_w;
-                self.key_state.key_a = keys.key_a;
-                self.key_state.key_s = keys.key_s;
-                self.key_state.key_d = keys.key_d;
-                self.key_state.space = keys.space;
+            if released.key_w { set_highlight(&self.ui.key_forward, false); }
+            if released.key_a { set_highlight(&self.ui.key_left   , false); }
+            if released.key_s { set_highlight(&self.ui.key_back   , false); }
+            if released.key_d { set_highlight(&self.ui.key_right  , false); }
+            if released.space { set_highlight(&self.ui.key_jump   , false); }
+
+            if self.auto_turn || strafe_bot.is_setting_up() {
                 self.input_rotation.0 += theta;
                 self.input_rotation.1 += phi;
-            } else {
-                if keys_pressed.key_f {
-                    self.strafe_bot = Some(StrafeBot::new());
-                }
             }
+        }
+
+        {
+            let ground_speed = self.player_state.vel.xy().magnitude();
+            self.update_tutorial(frame_duration_s, ground_speed, keys_pressed.key_f);
         }
 
         {

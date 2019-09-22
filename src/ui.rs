@@ -33,6 +33,8 @@ pub struct UI {
     pub document: Document,
     pub root_node: HtmlDivElement,
     pub canvas: HtmlCanvasElement,
+    pub dialog: HtmlElement,
+    pub keys: Element,
     pub key_forward: Element,
     pub key_back: Element,
     pub key_left: Element,
@@ -46,6 +48,7 @@ pub struct UI {
     pub menu_continue: HtmlButtonElement,
     pub menu_tutorial: HtmlButtonElement,
     pub menu_practice: HtmlButtonElement,
+    pub menu_movement: HtmlElement,
     pub move_vq3_like: HtmlButtonElement,
     pub move_qw_like: HtmlButtonElement,
     pub move_hybrid: HtmlButtonElement,
@@ -78,6 +81,8 @@ pub fn get_ui() -> UI {
 
     let root_node         = get_as::<HtmlDivElement   >(&document, "strafe_root");
     let canvas            = get_as::<HtmlCanvasElement>(&document, "strafe_canvas");
+    let dialog            = get_as::<HtmlElement      >(&document, "strafe_dialog");
+    let keys              = get_as::<Element          >(&document, "strafe_keys");
     let key_forward       = get_as::<Element          >(&document, "strafe_key_forward");
     let key_back          = get_as::<Element          >(&document, "strafe_key_back");
     let key_left          = get_as::<Element          >(&document, "strafe_key_left");
@@ -91,6 +96,7 @@ pub fn get_ui() -> UI {
     let menu_continue     = get_as::<HtmlButtonElement>(&document, "strafe_menu_continue");
     let menu_tutorial     = get_as::<HtmlButtonElement>(&document, "strafe_menu_tutorial");
     let menu_practice     = get_as::<HtmlButtonElement>(&document, "strafe_menu_practice");
+    let menu_movement     = get_as::<HtmlElement      >(&document, "strafe_menu_movement");
     let move_vq3_like     = get_as::<HtmlButtonElement>(&document, "strafe_move_vq3-like");
     let move_qw_like      = get_as::<HtmlButtonElement>(&document, "strafe_move_qw-like");
     let move_hybrid       = get_as::<HtmlButtonElement>(&document, "strafe_move_hybrid");
@@ -111,6 +117,8 @@ pub fn get_ui() -> UI {
         document,
         root_node,
         canvas,
+        dialog,
+        keys,
         key_forward,
         key_back,
         key_left,
@@ -124,6 +132,7 @@ pub fn get_ui() -> UI {
         menu_continue,
         menu_tutorial,
         menu_practice,
+        menu_movement,
         move_vq3_like,
         move_qw_like,
         move_hybrid,

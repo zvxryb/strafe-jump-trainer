@@ -195,6 +195,10 @@ fn rotation_matrix_2dof(yaw: Rad<f32>, pitch: Rad<f32>) -> Matrix3<f32> {
 }
 
 impl PlayerState {
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
+
     fn rotation_matrix(&self, add_yaw: Rad<f32>, add_pitch: Rad<f32>) -> Matrix3<f32> {
         let yaw   = (self.dir.0 + add_yaw).normalize();
         let mut pitch = self.dir.1 + add_pitch;

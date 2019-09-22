@@ -33,8 +33,12 @@ impl KeyState {
         !(self.key_w || self.key_s)
     }
 
-    pub fn rising_edge(self, previous: KeyState) -> KeyState {
+    pub fn pressed(self, previous: KeyState) -> KeyState {
         self & !previous
+    }
+
+    pub fn released(self, previous: KeyState) -> KeyState {
+        !self & previous
     }
 }
 

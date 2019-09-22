@@ -25,10 +25,11 @@ use cgmath::{Deg, Rad, Vector2};
 const CJ_START_X: f32 = -160.0;
 const CJ_ANGLE: Deg<f32> = Deg(150.0);
 
-const MAX_TURN_RATE: Deg<f32> = Deg(300.0);
+const MAX_TURN_RATE: Deg<f32> = Deg(250.0);
+const START_DELAY_S: f32 = 1.0;
 
 enum StrafeBotState {
-    Idle,
+    Setup(f32),
     Takeoff(Deg<f32>),
     Flight(bool, bool),
 }
@@ -133,18 +134,22 @@ fn clamp_angle<T: Angle>(x: T, max: T) -> T {
 impl StrafeBot {
     pub fn new() -> Self {
         Self{
-            state: StrafeBotState::Idle,
+            state: StrafeBotState::Setup(0.0),
             config: StrafeConfig::full_beat(),
         }
     }
 
-    pub fn take_off(&mut self) {
-        self.state = StrafeBotState::Takeoff(Deg(0.0));
+    pub fn is_setting_up(&self) -> bool {
+        if let StrafeBotState::Setup(..) = self.state {
+            true
+        } else {
+            false
+        }
     }
 
     fn strafe_turning(dt: f32,
         move_angle: Rad<f32>,
-        input_angle: Rad<f32>,
+        input_angle: Option<Rad<f32>>,
         warp_factor: f32,
         turn_rate: Rad<f32>,
         is_clockwise: bool,
@@ -152,12 +157,16 @@ impl StrafeBot {
         -> Rad<f32>
     {
         if warp_factor > 1.0 {
-            let optimal_angle = Rad((1.0 / warp_factor).acos());
-            let mut turn_angle = optimal_angle + turn_rate * dt;
-            if is_clockwise {
-                turn_angle = -turn_angle;
+            if let Some(input_angle) = input_angle {
+                let optimal_angle = Rad((1.0 / warp_factor).acos());
+                let mut turn_angle = optimal_angle + turn_rate * dt;
+                if is_clockwise {
+                    turn_angle = -turn_angle;
+                }
+                move_angle + turn_angle - input_angle
+            } else {
+                Rad::zero()
             }
-            move_angle + turn_angle - input_angle
         } else {
             Rad::zero()
         }
@@ -172,15 +181,31 @@ impl StrafeBot {
     )
         -> (KeyState, Rad<f32>, Rad<f32>)
     {
+        let speed = player.vel.xy().magnitude();
         let yaw   = player.dir.0 + add_yaw;
         let pitch = player.dir.1 + add_pitch;
-        let input_angle: Rad<f32> = Vector2::unit_y().angle(player.wish_dir(keys, add_yaw, add_pitch).xy());
+        let wish_dir = player.wish_dir(keys, add_yaw, add_pitch).xy();
+        let input_angle: Option<Rad<f32>> = if wish_dir.magnitude2() > 0.5 {
+            Some(Vector2::unit_y().angle(wish_dir))
+        } else {
+            None
+        };
         let max_turn: Rad<f32> = (MAX_TURN_RATE * dt).into();
         let (out_keys, turn_yaw) = loop { match &mut self.state {
-            StrafeBotState::Idle => {
+            StrafeBotState::Setup(duration) => {
                 let target_angle = -CJ_ANGLE;
                 let move_x = CJ_START_X - player.pos.x;
-                let should_move = move_x.abs() > 10.0;
+                if move_x.abs() < 10.0 && speed < 10.0 {
+                    *duration += dt;
+                    if *duration > START_DELAY_S {
+                        self.state = StrafeBotState::Takeoff(Deg::zero());
+                        continue;
+                    } else {
+                        break (KeyState::default(), Rad::zero());
+                    }
+                } else {
+                    *duration = 0.0;
+                }
                 let move_angle: Rad<f32> = if move_x > 0.0 {
                     Rad::zero()
                 } else {
@@ -189,20 +214,19 @@ impl StrafeBot {
                 let (ny, nx) = (move_angle - yaw).sin_cos();
                 const MOVE_THRESHOLD: f32 = 0.383;
                 let out_keys = KeyState{
-                    key_w: should_move && ny >  MOVE_THRESHOLD,
-                    key_a: should_move && nx < -MOVE_THRESHOLD,
-                    key_s: should_move && ny < -MOVE_THRESHOLD,
-                    key_d: should_move && nx >  MOVE_THRESHOLD,
+                    key_w: ny >  MOVE_THRESHOLD,
+                    key_a: nx < -MOVE_THRESHOLD,
+                    key_s: ny < -MOVE_THRESHOLD,
+                    key_d: nx >  MOVE_THRESHOLD,
                     ..Default::default()
                 };
                 break (out_keys, Into::<Rad<_>>::into(target_angle) - yaw);
             },
             StrafeBotState::Takeoff(turned) => {
-                if *turned >= CJ_ANGLE {
+                if *turned >= CJ_ANGLE || speed > 410.0 {
                     self.state = StrafeBotState::Flight(false, false);
                     continue;
                 }
-                let speed = player.vel.magnitude();
                 let cj_started = speed > 0.99 * speed_limit;
                 let out_keys = KeyState{
                     key_w: true,
@@ -219,19 +243,21 @@ impl StrafeBot {
                 break (out_keys, turn_angle);
             }
             StrafeBotState::Flight(jumped, is_clockwise) => {
-                let speed = player.vel.magnitude();
-                if speed < speed_limit {
-                    self.state = StrafeBotState::Idle;
+                if speed < 1.1 * speed_limit {
+                    self.state = StrafeBotState::Setup(0.0);
                     continue;
                 }
                 let is_grounded = player.is_grounded();
                 if is_grounded {
                     if !*jumped {
                         *jumped = true;
-                        *is_clockwise = player.vel.x < 0.0;
                         if player.pos.x < -512.0 {
                             *is_clockwise = true;
                         } else if player.pos.x > 512.0 {
+                            *is_clockwise = false;
+                        } else if player.vel.x < -80.0 {
+                            *is_clockwise = true;
+                        } else if player.vel.x > 80.0 {
                             *is_clockwise = false;
                         }
                     }

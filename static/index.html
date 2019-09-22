@@ -121,7 +121,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
                 text-align: right;
                 font-family: 'Inconsolata', monospace;
             }
-            #strafe_movement {
+            #strafe_menu_movement {
                 text-align: center;
             }
             #strafe_move_presets {
@@ -142,6 +142,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
                 background-color: #000000f0;
                 color: lightblue;
                 font-size: 12pt;
+            }
+            #strafe_dialog {
+                position: absolute;
+                top: 2em;
+                left: 50%;
+                transform: translate(-50%, 0);
+                width: 60em;
+                white-space: pre-wrap;
+                color: black;
+                font-size: 18pt;
             }
             #strafe_keys {
                 position: absolute;
@@ -173,7 +183,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
         <div id="strafe_root">
             <canvas id="strafe_canvas"></canvas>
             <div id="strafe_overlay">
-                <table id="strafe_keys">
+                <div id="strafe_dialog"></div>
+                <table id="strafe_keys" class="strafe_hidden">
                     <tbody>
                         <tr>
                             <td></td>
@@ -201,7 +212,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
                 <button id="strafe_menu_continue" class="strafe_hidden" type="button">Continue</button>
                 <button id="strafe_menu_tutorial" type="button">Tutorial</button>
                 <button id="strafe_menu_practice" type="button">Practice</button>
-                <div id="strafe_movement">
+                <div id="strafe_menu_movement">
                     <h2>Movement</h2>
                     <div id="strafe_move_presets">
                         <button id="strafe_move_vq3-like" type="button" data-tooltip="Moderate acceleration in a gradual arc; high top speed">Vanilla</button>
