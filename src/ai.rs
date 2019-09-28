@@ -15,7 +15,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::input::KeyState;
+use crate::input::{KeyState, KEYS_DEFAULT};
 use crate::player::PlayerState;
 
 use cgmath::prelude::*;
@@ -34,90 +34,71 @@ enum StrafeBotState {
     Flight(bool, bool),
 }
 
+#[derive(Clone, Default, Eq, PartialEq)]
 pub struct StrafeConfig {
     keys_cw: KeyState,
     keys_ccw: KeyState,
 }
 
 impl StrafeConfig {
-    fn keys_a() -> KeyState {
-        KeyState{
-            key_a: true,
-            ..Default::default()
-        }
-    }
+    const KEYS_A: KeyState = KeyState {
+        key_a: true,
+        ..KEYS_DEFAULT
+    };
 
-    fn keys_d() -> KeyState {
-        KeyState{
-            key_d: true,
-            ..Default::default()
-        }
-    }
+    const KEYS_D: KeyState = KeyState {
+        key_d: true,
+        ..KEYS_DEFAULT
+    };
 
-    fn keys_sa() -> KeyState {
-        KeyState{
-            key_s: true,
-            key_a: true,
-            ..Default::default()
-        }
-    }
+    const KEYS_SA: KeyState = KeyState {
+        key_s: true,
+        key_a: true,
+        ..KEYS_DEFAULT
+    };
 
-    fn keys_sd() -> KeyState {
-        KeyState{
-            key_s: true,
-            key_d: true,
-            ..Default::default()
-        }
-    }
+    const KEYS_SD: KeyState = KeyState {
+        key_s: true,
+        key_d: true,
+        ..KEYS_DEFAULT
+    };
 
-    fn keys_wa() -> KeyState {
-        KeyState{
-            key_w: true,
-            key_a: true,
-            ..Default::default()
-        }
-    }
+    const KEYS_WA: KeyState = KeyState {
+        key_w: true,
+        key_a: true,
+        ..KEYS_DEFAULT
+    };
 
-    fn keys_wd() -> KeyState {
-        KeyState{
-            key_w: true,
-            key_d: true,
-            ..Default::default()
-        }
-    }
+    const KEYS_WD: KeyState = KeyState {
+        key_w: true,
+        key_d: true,
+        ..KEYS_DEFAULT
+    };
 
-    pub fn full_beat() -> Self {
-        Self{
-            keys_cw : Self::keys_wd(),
-            keys_ccw: Self::keys_wa(),
-        }
-    }
+    pub const FULL_BEAT: Self = Self{
+        keys_cw : Self::KEYS_WD,
+        keys_ccw: Self::KEYS_WA,
+    };
 
-    pub fn full_beat_reverse() -> Self {
-        Self{
-            keys_cw : Self::keys_sa(),
-            keys_ccw: Self::keys_sd(),
-        }
-    }
+    pub const FULL_BEAT_REVERSE: Self = Self{
+        keys_cw : Self::KEYS_SA,
+        keys_ccw: Self::KEYS_SD,
+    };
 
-    pub fn half_beat_left() -> Self {
-        Self{
-            keys_cw : Self::keys_d(),
-            keys_ccw: Self::keys_wa(),
-        }
-    }
+    pub const HALF_BEAT_LEFT: Self = Self{
+        keys_cw : Self::KEYS_D,
+        keys_ccw: Self::KEYS_WA,
+    };
 
-    pub fn half_beat_right() -> Self {
-        Self{
-            keys_cw : Self::keys_wd(),
-            keys_ccw: Self::keys_a(),
-        }
-    }
+    pub const HALF_BEAT_RIGHT: Self = Self{
+        keys_cw : Self::KEYS_WD,
+        keys_ccw: Self::KEYS_A,
+    };
 }
 
 pub struct StrafeBot {
     state: StrafeBotState,
-    config: StrafeConfig,
+    pub config: StrafeConfig,
 }
 
 fn clamp_angle<T: Angle>(x: T, max: T) -> T {
@@ -132,10 +113,10 @@ fn clamp_angle<T: Angle>(x: T, max: T) -> T {
 }
 
 impl StrafeBot {
-    pub fn new() -> Self {
+    pub fn new(config: StrafeConfig) -> Self {
         Self{
             state: StrafeBotState::Setup(0.0),
-            config: StrafeConfig::full_beat(),
+            config,
         }
     }
 

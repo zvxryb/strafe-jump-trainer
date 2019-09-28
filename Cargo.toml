@@ -28,6 +28,7 @@ features = [
     'HtmlDivElement',
     'HtmlElement',
     'HtmlInputElement',
+    'HtmlSelectElement',
     'KeyboardEvent',
     'MouseEvent',
     'Node',

@@ -17,7 +17,7 @@
 
 use std::ops;
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Eq, PartialEq)]
 pub struct KeyState {
     pub key_w: bool,
     pub key_a: bool,
@@ -26,6 +26,15 @@ pub struct KeyState {
     pub key_f: bool,
     pub space: bool,
 }
+
+pub const KEYS_DEFAULT: KeyState = KeyState{
+    key_w: false,
+    key_a: false,
+    key_s: false,
+    key_d: false,
+    key_f: false,
+    space: false,
+};
 
 impl KeyState {
     pub fn is_side_strafe(self) -> bool {

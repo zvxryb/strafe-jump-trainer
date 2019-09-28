@@ -60,7 +60,7 @@ mod player;
 mod ai;
 mod ui;
 
-use ai::StrafeBot;
+use ai::{StrafeBot, StrafeConfig};
 use env::{Environment, Runway};
 use gl_context::AnyGlContext;
 use gfx::{
@@ -341,7 +341,7 @@ impl Application {
             },
             player_state: PlayerState::default(),
             kinematics: MOVE_VQ3_LIKE,
-            strafe_bot: Some(StrafeBot::new()),
+            strafe_bot: Some(StrafeBot::new(StrafeConfig::FULL_BEAT)),
             auto_hop : true,
             auto_move: true,
             auto_turn: true,
@@ -364,7 +364,9 @@ impl Application {
             hud_mesh,
         };
 
+        app.update_mouse_sensitivity();
         app.update_movement_display();
+        app.update_bot_display();
 
         app
     }
@@ -400,10 +402,11 @@ impl Application {
                             3. Alternates between left-forward and right-forward motion keys\n\
                             4. Keeps his cursor within the green part of the strafe HUD\n\n\
                             When done correctly, the cursor lights up to indicate acceleration"));
-                        self.strafe_bot = Some(StrafeBot::new());
+                        self.strafe_bot = Some(StrafeBot::new(StrafeConfig::FULL_BEAT));
                         self.auto_hop  = true;
                         self.auto_move = true;
                         self.auto_turn = true;
+                        self.update_bot_display();
                         show(&self.ui.keys);
                     }
                     TutorialStage::Hopping(..) => {
@@ -411,10 +414,11 @@ impl Application {
                             We'll begin with hopping practice.  Strafe bot will continue to handle basic \
                             motion, but you will have to press SPACE as indicated on the HUD.\n\n\
                             Reach 1000 UPS to continue."));
-                        self.strafe_bot = Some(StrafeBot::new());
+                        self.strafe_bot = Some(StrafeBot::new(StrafeConfig::FULL_BEAT));
                         self.auto_hop  = false;
                         self.auto_move = true;
                         self.auto_turn = true;
+                        self.update_bot_display();
                         show(&self.ui.keys);
                     }
                     TutorialStage::Moving(..) => {
@@ -422,10 +426,11 @@ impl Application {
                             Next, let's practice movement keys.  This time you'll have control over \
                             W/A/S/D, exclusively.  Follow along with the HUD indicators.\n\n\
                             Reach 1000 UPS to continue."));
-                        self.strafe_bot = Some(StrafeBot::new());
+                        self.strafe_bot = Some(StrafeBot::new(StrafeConfig::FULL_BEAT));
                         self.auto_hop  = true;
                         self.auto_move = false;
                         self.auto_turn = true;
+                        self.update_bot_display();
                         show(&self.ui.keys);
                     }
                     TutorialStage::Turning(..) => {
@@ -434,10 +439,11 @@ impl Application {
                             motion to keep your cursor in the green area of the HUD, while Strafe Bot \
                             handles movement.  Keep the cursor lit up for as much time as possible.\n\n\
                             Reach 1000 UPS to continue."));
-                        self.strafe_bot = Some(StrafeBot::new());
+                        self.strafe_bot = Some(StrafeBot::new(StrafeConfig::FULL_BEAT));
                         self.auto_hop  = true;
                         self.auto_move = true;
                         self.auto_turn = false;
+                        self.update_bot_display();
                         show(&self.ui.keys);
                     }
                 };
@@ -445,18 +451,21 @@ impl Application {
                 hide(self.ui.menu_tutorial.dyn_ref::<Element>().unwrap());
                 show(self.ui.menu_practice.dyn_ref::<Element>().unwrap());
                 hide(self.ui.menu_movement.dyn_ref::<Element>().unwrap());
+                hide(self.ui.menu_bot     .dyn_ref::<Element>().unwrap());
             },
             None => {
                 dialog.set_text_content(None);
-                self.strafe_bot = Some(StrafeBot::new());
+                self.strafe_bot = None;
                 self.auto_hop  = false;
                 self.auto_move = false;
                 self.auto_turn = false;
+                self.update_bot_display();
                 show(self.ui.menu_continue.dyn_ref::<Element>().unwrap());
                 show(self.ui.menu_tutorial.dyn_ref::<Element>().unwrap());
                 hide(self.ui.menu_practice.dyn_ref::<Element>().unwrap());
                 show(self.ui.menu_movement.dyn_ref::<Element>().unwrap());
-                show(&self.ui.keys);
+                show(self.ui.menu_bot     .dyn_ref::<Element>().unwrap());
+                hide(&self.ui.keys);
             },
         };
     }
@@ -469,6 +478,13 @@ impl Application {
     fn hide_menu(&mut self) {
         hide(&self.ui.menu);
         self.menu_shown = false;
+    }
+
+    fn update_mouse_sensitivity(&mut self) {
+        let sense = self.mouse_scale;
+        self.ui.mouse_input.set_value_as_number(sense.0.log2() as f64);
+        self.ui.mouse_display.dyn_ref::<web_sys::Node>().unwrap().set_text_content(
+            Some(format!("{:.0} counts/rotation", Rad::<f32>::full_turn() / sense).as_str()));
     }
 
     fn update_movement_display(&mut self) {
@@ -540,6 +556,62 @@ impl Application {
         self.update_movement_display();
     }
 
+    fn update_bot_display(&mut self) {
+        self.ui.bot_mode.set_value(match self.strafe_bot {
+            Some(StrafeBot{config: StrafeConfig::FULL_BEAT        , ..}) => "full-beat",
+            Some(StrafeBot{config: StrafeConfig::FULL_BEAT_REVERSE, ..}) => "full-beat-reverse",
+            Some(StrafeBot{config: StrafeConfig::HALF_BEAT_LEFT   , ..}) => "half-beat-left",
+            Some(StrafeBot{config: StrafeConfig::HALF_BEAT_RIGHT  , ..}) => "half-beat-right",
+            Some(_) => "unspecified",
+            None => "disabled",
+        });
+        if self.strafe_bot.is_some() {
+            self.ui.bot_hop .set_checked(self.auto_hop);
+            self.ui.bot_move.set_checked(self.auto_move);
+            self.ui.bot_turn.set_checked(self.auto_turn);
+        } else {
+            self.ui.bot_hop .set_checked(false);
+            self.ui.bot_move.set_checked(false);
+            self.ui.bot_turn.set_checked(false);
+            self.ui.bot_hop .set_disabled(true);
+            self.ui.bot_move.set_disabled(true);
+            self.ui.bot_turn.set_disabled(true);
+        }
+    }
+
+    fn update_bot_input(&mut self) {
+        fn update_config(bot: &mut Option<StrafeBot>, config: StrafeConfig) {
+            if let Some(bot) = bot {
+                bot.config = config;
+            } else {
+                *bot = Some(StrafeBot::new(config));
+            }
+        };
+        match self.ui.bot_mode.value().as_str() {
+            "full-beat"         => update_config(&mut self.strafe_bot, StrafeConfig::FULL_BEAT),
+            "full-beat-reverse" => update_config(&mut self.strafe_bot, StrafeConfig::FULL_BEAT_REVERSE),
+            "half-beat-left"    => update_config(&mut self.strafe_bot, StrafeConfig::HALF_BEAT_LEFT),
+            "half-beat-right"   => update_config(&mut self.strafe_bot, StrafeConfig::HALF_BEAT_RIGHT),
+            "disabled"          => { self.strafe_bot = None },
+            _ => {},
+        }
+        if self.strafe_bot.is_some() {
+            self.auto_hop  = self.ui.bot_hop .checked();
+            self.auto_move = self.ui.bot_move.checked();
+            self.auto_turn = self.ui.bot_turn.checked();
+            self.ui.bot_hop .set_disabled(false);
+            self.ui.bot_move.set_disabled(false);
+            self.ui.bot_turn.set_disabled(false);
+        } else {
+            self.auto_hop  = false;
+            self.auto_move = false;
+            self.auto_turn = false;
+            self.ui.bot_hop .set_disabled(true);
+            self.ui.bot_move.set_disabled(true);
+            self.ui.bot_turn.set_disabled(true);
+        }
+    }
+
     fn setup_events(app: Rc<RefCell<Self>>) {
         {
             let w = app.borrow().ui.canvas.client_width ();
@@ -594,7 +666,8 @@ impl Application {
             Closure::wrap(Box::new(move |event: MouseEvent| {
                 let have_pointer = app.borrow().have_pointer;
                 let menu_shown = app.borrow().menu_shown;
-                if have_pointer && !menu_shown {
+                let override_turning = app.borrow().override_turning();
+                if have_pointer && !menu_shown && !override_turning {
                     let scale = app.borrow().mouse_scale;
                     app.borrow_mut().input_rotation.0 -= scale * (event.movement_x() as f32);
                     app.borrow_mut().input_rotation.1 -= scale * (event.movement_y() as f32);
@@ -702,6 +775,19 @@ impl Application {
             practice_cb.as_ref().dyn_ref().unwrap())
             .expect("failed to add menu_practice click listener");
 
+        let mouse_sense_cb = {
+            let app = app.clone();
+            Closure::wrap(Box::new(move || {
+                let log2_sense = app.borrow().ui.mouse_input.value_as_number() as f32;
+                app.borrow_mut().mouse_scale = Rad::<f32>(log2_sense.exp2());
+                app.borrow_mut().update_mouse_sensitivity();
+            }) as Box<dyn FnMut()>)
+        };
+
+        app.borrow().ui.mouse_input.add_event_listener_with_callback("input",
+            mouse_sense_cb.as_ref().dyn_ref().unwrap())
+            .expect("failed to add mouse_input input listener");
+
         let gen_move_preset_cb = |kinematics: Kinematics| {
             let app = app.clone();
             Closure::wrap(Box::new(move || {
@@ -751,6 +837,24 @@ impl Application {
                 .expect("failed to add movement value change listener");
         });
 
+        let update_bot_cb = {
+            let app = app.clone();
+            Closure::wrap(Box::new(move || {
+                app.borrow_mut().update_bot_input();
+            }) as Box<dyn FnMut()>)
+        };
+
+        [
+            &app.borrow().ui.menu_bot,
+            &app.borrow().ui.bot_hop,
+            &app.borrow().ui.bot_move,
+            &app.borrow().ui.bot_turn,
+        ].iter().for_each(|element| {
+            element.add_event_listener_with_callback("change",
+                update_bot_cb.as_ref().dyn_ref().unwrap())
+                .expect("failed to add movement value change listener");
+        });
+
         // stop tracking these so they stay around for the lifetime of the app
         resize_cb.forget();
         fullscreen_cb.forget();
@@ -761,11 +865,17 @@ impl Application {
         continue_cb.forget();
         tutorial_cb.forget();
         practice_cb.forget();
+        mouse_sense_cb.forget();
         move_vq3_like_cb.forget();
         move_qw_like_cb.forget();
         move_hybrid_cb.forget();
         update_movement_cb.forget();
+        update_bot_cb.forget();
     }
+
+    fn override_hopping(&self) -> bool { self.strafe_bot.as_ref().map_or(false, |bot| self.auto_hop  || bot.is_setting_up()) }
+    fn override_moving (&self) -> bool { self.strafe_bot.as_ref().map_or(false, |bot| self.auto_move || bot.is_setting_up()) }
+    fn override_turning(&self) -> bool { self.strafe_bot.as_ref().map_or(false, |bot| self.auto_turn || bot.is_setting_up()) }
 
     fn tick_sim(&mut self, dt: f32) {
         let u = dt / self.tick_remainder_s;
@@ -853,17 +963,15 @@ impl Application {
     fn update_keys(&mut self) -> KeyState {
         self.key_state = self.input_key_state;
 
-        if let Some(strafe_bot) = &self.strafe_bot {
-            if self.auto_move || strafe_bot.is_setting_up() {
-                self.key_state.key_w = self.bot_key_state.key_w;
-                self.key_state.key_a = self.bot_key_state.key_a;
-                self.key_state.key_s = self.bot_key_state.key_s;
-                self.key_state.key_d = self.bot_key_state.key_d;
-            }
+        if self.override_moving() {
+            self.key_state.key_w = self.bot_key_state.key_w;
+            self.key_state.key_a = self.bot_key_state.key_a;
+            self.key_state.key_s = self.bot_key_state.key_s;
+            self.key_state.key_d = self.bot_key_state.key_d;
+        }
 
-            if self.auto_hop {
-                self.key_state.space = self.bot_key_state.space;
-            }
+        if self.override_hopping() {
+            self.key_state.space = self.bot_key_state.space;
         }
 
         let keys_pressed = self.key_state.pressed(self.key_history);
@@ -975,7 +1083,7 @@ impl Application {
             if released.key_d { set_highlight(&self.ui.key_right  , false); }
             if released.space { set_highlight(&self.ui.key_jump   , false); }
 
-            if self.auto_turn || strafe_bot.is_setting_up() {
+            if self.override_turning() {
                 self.input_rotation.0 += theta;
                 self.input_rotation.1 += phi;
             }

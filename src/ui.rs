@@ -24,6 +24,7 @@ use web_sys::{
     HtmlDivElement,
     HtmlElement,
     HtmlInputElement,
+    HtmlSelectElement,
     Window,
 };
 
@@ -48,6 +49,8 @@ pub struct UI {
     pub menu_continue: HtmlButtonElement,
     pub menu_tutorial: HtmlButtonElement,
     pub menu_practice: HtmlButtonElement,
+    pub mouse_input: HtmlInputElement,
+    pub mouse_display: Element,
     pub menu_movement: HtmlElement,
     pub move_vq3_like: HtmlButtonElement,
     pub move_qw_like: HtmlButtonElement,
@@ -63,6 +66,11 @@ pub struct UI {
     pub move_turn_enabled: HtmlInputElement,
     pub move_turn_speed: HtmlInputElement,
     pub move_turn_accel: HtmlInputElement,
+    pub menu_bot: HtmlElement,
+    pub bot_mode: HtmlSelectElement,
+    pub bot_hop: HtmlInputElement,
+    pub bot_move: HtmlInputElement,
+    pub bot_turn: HtmlInputElement,
 }
 
 pub fn get_ui() -> UI {
@@ -96,6 +104,8 @@ pub fn get_ui() -> UI {
     let menu_continue     = get_as::<HtmlButtonElement>(&document, "strafe_menu_continue");
     let menu_tutorial     = get_as::<HtmlButtonElement>(&document, "strafe_menu_tutorial");
     let menu_practice     = get_as::<HtmlButtonElement>(&document, "strafe_menu_practice");
+    let mouse_input       = get_as::<HtmlInputElement >(&document, "strafe_mouse_input");
+    let mouse_display     = get_as::<Element          >(&document, "strafe_mouse_display");
     let menu_movement     = get_as::<HtmlElement      >(&document, "strafe_menu_movement");
     let move_vq3_like     = get_as::<HtmlButtonElement>(&document, "strafe_move_vq3-like");
     let move_qw_like      = get_as::<HtmlButtonElement>(&document, "strafe_move_qw-like");
@@ -111,6 +121,11 @@ pub fn get_ui() -> UI {
     let move_turn_enabled = get_as::<HtmlInputElement >(&document, "strafe_move_turn_enabled");
     let move_turn_speed   = get_as::<HtmlInputElement >(&document, "strafe_move_turn_speed");
     let move_turn_accel   = get_as::<HtmlInputElement >(&document, "strafe_move_turn_accel");
+    let menu_bot          = get_as::<HtmlElement      >(&document, "strafe_menu_bot");
+    let bot_mode          = get_as::<HtmlSelectElement>(&document, "strafe_bot_mode");
+    let bot_hop           = get_as::<HtmlInputElement >(&document, "strafe_bot_hop");
+    let bot_move          = get_as::<HtmlInputElement >(&document, "strafe_bot_move");
+    let bot_turn          = get_as::<HtmlInputElement >(&document, "strafe_bot_turn");
 
     UI{
         window,
@@ -132,6 +147,8 @@ pub fn get_ui() -> UI {
         menu_continue,
         menu_tutorial,
         menu_practice,
+        mouse_input,
+        mouse_display,
         menu_movement,
         move_vq3_like,
         move_qw_like,
@@ -147,5 +164,10 @@ pub fn get_ui() -> UI {
         move_turn_enabled,
         move_turn_speed,
         move_turn_accel,
+        menu_bot,
+        bot_mode,
+        bot_hop,
+        bot_move,
+        bot_turn,
     }
 }
