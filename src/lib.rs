@@ -602,6 +602,7 @@ impl Application {
             self.ui.bot_hop .set_disabled(false);
             self.ui.bot_move.set_disabled(false);
             self.ui.bot_turn.set_disabled(false);
+            show(&self.ui.keys);
         } else {
             self.auto_hop  = false;
             self.auto_move = false;
@@ -609,6 +610,7 @@ impl Application {
             self.ui.bot_hop .set_disabled(true);
             self.ui.bot_move.set_disabled(true);
             self.ui.bot_turn.set_disabled(true);
+            hide(&self.ui.keys);
         }
     }
 
