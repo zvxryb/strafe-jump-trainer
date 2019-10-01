@@ -155,7 +155,7 @@ impl StrafeBot {
 
     pub fn sim(&mut self, dt: f32,
         player: &PlayerState,
-        keys: &KeyState,
+        keys: KeyState,
         speed_limit: f32,
         add_yaw: Rad<f32>,
         add_pitch: Rad<f32>,

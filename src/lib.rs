@@ -337,7 +337,7 @@ impl Application {
                 fovy: Deg(80.0).into(),
                 aspect: 1.0,
                 near: 0.1 * PLAYER_RADIUS,
-                far: 100000.0,
+                far: 100_000.0,
             },
             player_state: PlayerState::default(),
             kinematics: MOVE_VQ3_LIKE,
@@ -482,26 +482,26 @@ impl Application {
 
     fn update_mouse_sensitivity(&mut self) {
         let sense = self.mouse_scale;
-        self.ui.mouse_input.set_value_as_number(sense.0.log2() as f64);
+        self.ui.mouse_input.set_value_as_number(f64::from(sense.0.log2()));
         self.ui.mouse_display.dyn_ref::<web_sys::Node>().unwrap().set_text_content(
             Some(format!("{:.0} counts/rotation", Rad::<f32>::full_turn() / sense).as_str()));
     }
 
     fn update_movement_display(&mut self) {
-        self.ui.move_gravity     .set_value_as_number(self.kinematics.gravity               as f64);
-        self.ui.move_jump_impulse.set_value_as_number(self.kinematics.jump_impulse          as f64);
-        self.ui.move_stall_speed .set_value_as_number(self.kinematics.friction.stall_speed  as f64);
-        self.ui.move_friction    .set_value_as_number(self.kinematics.friction.friction     as f64);
-        self.ui.move_ground_speed.set_value_as_number(self.kinematics.move_ground.max_speed as f64);
-        self.ui.move_ground_accel.set_value_as_number(self.kinematics.move_ground.accel     as f64);
-        self.ui.move_air_speed   .set_value_as_number(self.kinematics.move_air.max_speed    as f64);
-        self.ui.move_air_accel   .set_value_as_number(self.kinematics.move_air.accel        as f64);
+        self.ui.move_gravity     .set_value_as_number(f64::from(self.kinematics.gravity              ));
+        self.ui.move_jump_impulse.set_value_as_number(f64::from(self.kinematics.jump_impulse         ));
+        self.ui.move_stall_speed .set_value_as_number(f64::from(self.kinematics.friction.stall_speed ));
+        self.ui.move_friction    .set_value_as_number(f64::from(self.kinematics.friction.friction    ));
+        self.ui.move_ground_speed.set_value_as_number(f64::from(self.kinematics.move_ground.max_speed));
+        self.ui.move_ground_accel.set_value_as_number(f64::from(self.kinematics.move_ground.accel    ));
+        self.ui.move_air_speed   .set_value_as_number(f64::from(self.kinematics.move_air.max_speed   ));
+        self.ui.move_air_accel   .set_value_as_number(f64::from(self.kinematics.move_air.accel       ));
         if let Some(move_air_turning) = self.kinematics.move_air_turning {
             self.ui.move_turn_enabled.set_checked(true);
             self.ui.move_turn_speed  .set_disabled(false);
             self.ui.move_turn_accel  .set_disabled(false);
-            self.ui.move_turn_speed  .set_value_as_number(move_air_turning.max_speed as f64);
-            self.ui.move_turn_accel  .set_value_as_number(move_air_turning.accel     as f64);
+            self.ui.move_turn_speed  .set_value_as_number(f64::from(move_air_turning.max_speed));
+            self.ui.move_turn_accel  .set_value_as_number(f64::from(move_air_turning.accel    ));
         } else {
             self.ui.move_turn_enabled.set_checked(false);
             self.ui.move_turn_speed  .set_disabled(true);
@@ -649,7 +649,7 @@ impl Application {
                     app.borrow_mut().show_menu();
                     document.exit_pointer_lock();
                 } else {
-                    let _ = root_node.request_pointer_lock();
+                    root_node.request_pointer_lock();
                 }
             }) as Box<dyn FnMut()>)
         };
@@ -739,7 +739,7 @@ impl Application {
                 let root_node = app.borrow().ui.root_node.clone();
                 app.borrow_mut().hide_menu();
                 let _ = root_node.request_fullscreen();
-                let _ = root_node.request_pointer_lock();
+                root_node.request_pointer_lock();
             }) as Box<dyn FnMut()>)
         };
 
@@ -754,7 +754,7 @@ impl Application {
                 app.borrow_mut().set_stage(Some(TutorialStage::Intro(TimedStage::Waiting(0.0))));
                 app.borrow_mut().hide_menu();
                 let _ = root_node.request_fullscreen();
-                let _ = root_node.request_pointer_lock();
+                root_node.request_pointer_lock();
             }) as Box<dyn FnMut()>)
         };
 
@@ -769,7 +769,7 @@ impl Application {
                 app.borrow_mut().set_stage(None);
                 app.borrow_mut().hide_menu();
                 let _ = root_node.request_fullscreen();
-                let _ = root_node.request_pointer_lock();
+                root_node.request_pointer_lock();
             }) as Box<dyn FnMut()>)
         };
 
@@ -890,7 +890,7 @@ impl Application {
         let is_jumping = self.key_state.space;
         let is_turning = self.key_state.is_side_strafe();
 
-        let wish_dir = self.player_state.wish_dir(&self.key_state, Rad::zero(), Rad::zero());
+        let wish_dir = self.player_state.wish_dir(self.key_state, Rad::zero(), Rad::zero());
         self.player_state.sim_kinematics(&self.kinematics, dt, wish_dir, is_jumping, is_turning);
 
         self.environment.interact(&mut self.player_state);
@@ -1039,7 +1039,7 @@ impl Application {
         {
             let fovx = Rad::atan(self.perspective.aspect * (self.perspective.fovy / 2.0).tan()) * 2.0;
             let wish_dir = self.player_state.wish_dir(
-                &self.key_state,
+                self.key_state,
                 self.input_rotation.0,
                 self.input_rotation.1).xy();
             let velocity_xy = self.player_state.vel.xy();
@@ -1066,7 +1066,7 @@ impl Application {
 
         if let Some(strafe_bot) = &mut self.strafe_bot {
             let (keys, theta, phi) = strafe_bot.sim(frame_duration_s,
-                &self.player_state, &self.key_state, max_speed, self.input_rotation.0, self.input_rotation.1);
+                &self.player_state, self.key_state, max_speed, self.input_rotation.0, self.input_rotation.1);
             self.bot_key_history = self.bot_key_state;
             self.bot_key_state   = keys;
 
@@ -1109,7 +1109,7 @@ impl Application {
                 .set_text_content(Some(format!("{:.1}KPH", speed_kph).as_str()));
         }
 
-        if frame_duration_s > 0.000001 {
+        if frame_duration_s > 0.000_001 {
             let framerate = 1.0 / frame_duration_s;
 
             const DECAY: f32 = 0.05;
@@ -1143,7 +1143,8 @@ pub fn strafe_main() {
                     .unwrap()
                     .as_ref()
                     .dyn_ref()
-                    .unwrap());
+                    .unwrap())
+                .unwrap_or_else(|_| panic!("failed to request animation frame"));
         }) as Box<dyn FnMut()>)
     });
 
@@ -1154,5 +1155,6 @@ pub fn strafe_main() {
             .unwrap()
             .as_ref()
             .dyn_ref()
-            .unwrap());
+            .unwrap())
+        .unwrap_or_else(|_| panic!("failed to request animation frame"));
 }

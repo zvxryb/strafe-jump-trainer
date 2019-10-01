@@ -19,11 +19,9 @@ use crate::gl_context::GlContext;
 use crate::gfx::{Color, draw_pass, gen_box, Mesh, Program, UniformValue};
 use crate::player::{PlayerState, PLAYER_RADIUS};
 
-use cgmath::prelude::*;
 use rand::prelude::*;
 
 use cgmath::{Matrix4, Point3, Rad, Vector3};
-use web_sys::WebGl2RenderingContext;
 
 pub trait Environment {
     fn atmosphere_color(&self) -> Color;

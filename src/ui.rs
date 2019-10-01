@@ -82,9 +82,9 @@ pub fn get_ui() -> UI {
 
     fn get_as<T: JsCast>(document: &Document, id: &str) -> T {
         document.get_element_by_id(id)
-            .expect(format!("failed to get {}", id).as_str())
+            .unwrap_or_else(|| panic!("failed to get {}", id))
             .dyn_into::<T>()
-            .expect(format!("failed to cast {}", id).as_str())
+            .unwrap_or_else(|_| panic!("failed to cast {}", id))
     }
 
     let root_node         = get_as::<HtmlDivElement   >(&document, "strafe_root");

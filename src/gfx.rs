@@ -16,12 +16,12 @@
  */
 
 use crate::gl_context::GlContext;
-use crate::{log, warn, error};
+use crate::{log, error};
 
 use cgmath::prelude::*;
 use rand::prelude::*;
 
-use cgmath::{Deg, Matrix4, Point2, Point3, Vector2, Vector3};
+use cgmath::{Matrix4, Point2, Point3, Vector2, Vector3};
 use js_sys::Uint8Array;
 use wasm_bindgen::JsCast;
 use web_sys::{
@@ -30,7 +30,6 @@ use web_sys::{
     WebGlRenderingContext,
     WebGl2RenderingContext,
     WebGlShader,
-    WebGlTexture,
     WebGlUniformLocation,
 };
 
@@ -50,7 +49,7 @@ impl Color {
         Self{r, g, b, a}
     }
     fn linear_to_srgb(x: f32) -> f32 {
-        if x < 0.0031308 {
+        if x < 0.003_130_8 {
             12.92 * x
         } else {
             1.055 * x.powf(1.0/2.4) - 0.055
@@ -66,6 +65,7 @@ impl Color {
     }
 }
 
+#[allow(clippy::needless_lifetimes)]
 fn get_byte_view<'a, T>(data: &'a [T]) -> &'a [u8]
 where
     T: 'static + Sized + Copy + Send + Sync
@@ -139,18 +139,6 @@ where
     Some(vbo)
 }
 
-pub fn log_mat4(m: &Matrix4<f32>) {
-    log(format!("
-        |{:3.6} {:3.6} {:3.6} {:3.6}|
-        |{:3.6} {:3.6} {:3.6} {:3.6}|
-        |{:3.6} {:3.6} {:3.6} {:3.6}|
-        |{:3.6} {:3.6} {:3.6} {:3.6}|",
-        m.x.x, m.y.x, m.z.x, m.w.x,
-        m.x.y, m.y.y, m.z.y, m.w.y,
-        m.x.z, m.y.z, m.z.z, m.w.z,
-        m.x.w, m.y.w, m.z.w, m.w.w).as_str());
-}
-
 struct ProgramData {
     size: i32,
     type_: u32,
@@ -160,7 +148,7 @@ struct ProgramData {
 impl ProgramData {
     fn simple_type(&self) -> (u32, i32) {
         match self.type_ {
-            WebGlRenderingContext::FLOAT      => (WebGlRenderingContext::FLOAT,  1 * self.size),
+            WebGlRenderingContext::FLOAT      => (WebGlRenderingContext::FLOAT,      self.size),
             WebGlRenderingContext::FLOAT_VEC2 => (WebGlRenderingContext::FLOAT,  2 * self.size),
             WebGlRenderingContext::FLOAT_VEC3 => (WebGlRenderingContext::FLOAT,  3 * self.size),
             WebGlRenderingContext::FLOAT_VEC4 => (WebGlRenderingContext::FLOAT,  4 * self.size),
@@ -314,7 +302,6 @@ pub struct VertexAttrib {
     normalized: bool,
     stride: i32,
     offset: i32,
-    divisor: u32,
 }
 
 pub trait VertexLayout: 'static + Sized + Copy + Send + Sync {
@@ -398,6 +385,8 @@ impl MeshVertex {
     pub fn new(pos: Point3<f32>, norm: Vector3<f32>, uv: Point2<f32>) -> MeshVertex {
         MeshVertex{pos, norm, uv}
     }
+
+    #[allow(clippy::many_single_char_names, clippy::too_many_arguments)]
     pub fn from_scalars(x: f32, y: f32, z: f32, nx: f32, ny: f32, nz: f32, u: f32, v: f32) -> MeshVertex {
         MeshVertex{
             pos: Point3::new(x, y, z),
@@ -427,7 +416,6 @@ impl VertexLayout for MeshVertex {
                 normalized: false,
                 stride: 32,
                 offset: 0,
-                divisor: 0,
             },
             VertexAttrib {
                 ident: "norm",
@@ -436,7 +424,6 @@ impl VertexLayout for MeshVertex {
                 normalized: false,
                 stride: 32,
                 offset: 12,
-                divisor: 0,
             },
             VertexAttrib {
                 ident: "uv",
@@ -445,7 +432,6 @@ impl VertexLayout for MeshVertex {
                 normalized: false,
                 stride: 32,
                 offset: 24,
-                divisor: 0,
             }
         ];
         &ATTRIBS
@@ -478,7 +464,7 @@ pub fn gen_box(gl: &GlContext, min: Point3<f32>, max: Point3<f32>, uv_scale: f32
         face_uv(min.xzy(), max.xzy(), uv_scale, true ).into_iter().map(|v| MeshVertex::new(v.pos.xzy(), v.norm.xzy(), v.uv)).collect::<Vec<MeshVertex>>(),
         face_uv(min.zyx(), max.zyx(), uv_scale, false).into_iter().map(|v| MeshVertex::new(v.pos.zyx(), v.norm.zyx(), v.uv)).collect::<Vec<MeshVertex>>(),
         face_uv(min.zyx(), max.zyx(), uv_scale, true ).into_iter().map(|v| MeshVertex::new(v.pos.zyx(), v.norm.zyx(), v.uv)).collect::<Vec<MeshVertex>>(),
-    ].into_iter()
+    ].iter()
         .flatten()
         .cloned()
         .collect::<Vec<_>>()
@@ -492,9 +478,6 @@ pub struct HudVertex {
 }
 
 impl HudVertex {
-    pub fn new(pos: Point2<f32>) -> HudVertex {
-        HudVertex{pos}
-    }
     pub fn from_scalars(x: f32, y: f32) -> HudVertex {
         HudVertex{
             pos: Point2::new(x, y),
@@ -520,7 +503,6 @@ impl VertexLayout for HudVertex {
                 normalized: false,
                 stride: 8,
                 offset: 0,
-                divisor: 0,
             },
         ];
         &ATTRIBS
@@ -750,7 +732,6 @@ impl WarpEffect {
                     normalized: false,
                     stride: 12,
                     offset: 0,
-                    divisor: 0,
                 }
             ]
         );
@@ -768,7 +749,6 @@ impl WarpEffect {
                     normalized: false,
                     stride: 12,
                     offset: 0,
-                    divisor: 0,
                 }
             ]
         );
@@ -810,7 +790,6 @@ impl WarpEffect {
                     normalized: false,
                     stride: 12,
                     offset: 0,
-                    divisor: 0,
                 }
             ]
         );
@@ -830,7 +809,6 @@ impl WarpEffect {
                     normalized: false,
                     stride: 4,
                     offset: 0,
-                    divisor: 0,
                 }
             ]);
 

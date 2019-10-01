@@ -21,7 +21,6 @@ use cgmath::{
     Deg,
     Matrix3,
     Matrix4,
-    Point2,
     Point3,
     Rad,
     Vector2,
@@ -41,7 +40,7 @@ pub struct Friction {
 }
 
 impl Friction {
-    fn sim(&self, vel: &mut Vector3<f32>, dt: f32) {
+    fn sim(self, vel: &mut Vector3<f32>, dt: f32) {
         let speed0 = vel.xy().magnitude();
         if speed0 > 0.0001 {
             let speed1 = (speed0 - speed0.max(self.stall_speed) * self.friction * dt).max(0.0);
@@ -58,7 +57,7 @@ pub struct Movement {
 }
 
 impl Movement {
-    fn sim(&self, vel: &mut Vector3<f32>, dt: f32, wish_dir: Vector2<f32>) {
+    fn sim(self, vel: &mut Vector3<f32>, dt: f32, wish_dir: Vector2<f32>) {
         let add_speed = (self.max_speed - vel.xy().dot(wish_dir)).max(0.0);
         let dv = wish_dir.extend(0.0) * (self.accel * dt).min(add_speed);
         *vel += dv;
@@ -219,12 +218,12 @@ impl PlayerState {
 
     pub fn add_rotation(&mut self, yaw: Rad<f32>, pitch: Rad<f32>) {
         self.dir.0 = (self.dir.0 + yaw).normalize();
-        self.dir.1 = self.dir.1 + pitch;
+        self.dir.1 += pitch;
         if self.dir.1 < Rad::zero      () { self.dir.1 = Rad::zero      (); }
         if self.dir.1 > Rad::turn_div_2() { self.dir.1 = Rad::turn_div_2(); }
     }
 
-    pub fn wish_dir(&self, key_state: &KeyState, add_yaw: Rad<f32>, add_pitch: Rad<f32>) -> Vector2<f32> {
+    pub fn wish_dir(&self, key_state: KeyState, add_yaw: Rad<f32>, add_pitch: Rad<f32>) -> Vector2<f32> {
         let rotation = self.rotation_matrix(add_yaw, add_pitch);
         let up      = Vector3::<f32>::unit_z();
         let right   = rotation.x;
