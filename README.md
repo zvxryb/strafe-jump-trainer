@@ -1,4 +1,4 @@
-# Strafe Jump Trainer [![Build Status](https://travis-ci.com/zvxryb/strafe-jump-trainer.svg?branch=master)](https://travis-ci.com/zvxryb/strafe-jump-trainer)
+# Strafe Jump Trainer
 
 ![screenshot](./screenshot.png)
 
