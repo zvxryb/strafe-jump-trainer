@@ -1059,7 +1059,7 @@ impl Application {
                 ("warp_factor" , UniformValue::Float  (warp_factor)),
             ], vec![
                 (&[], self.hud_mesh.clone()),
-            ]);
+            ], None);
 
             self.gl.gl().disable(WebGlRenderingContext::BLEND);
         }

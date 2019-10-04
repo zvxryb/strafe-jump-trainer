@@ -220,7 +220,10 @@ impl Program {
             .map(|(_, location)| *location)
     }
 
-    fn assign_vertex_attribs(&self, gl: &GlContext, vertex_attribs: &'static [VertexAttrib]) {
+    fn assign_vertex_attribs<'a, VertexAttribs>(&self, gl: &GlContext, vertex_attribs: VertexAttribs)
+    where
+        VertexAttribs: IntoIterator<Item = &'a VertexAttrib>
+    {
         for vertex_attrib in vertex_attribs {
             if let Some((program_attrib, location)) = self.attributes.iter()
                 .find(|(attrib, _)| attrib.name == vertex_attrib.ident)
@@ -331,11 +334,20 @@ impl Mesh {
     }
 }
 
+pub struct VertexAttribDivisor(u32);
+
+pub struct InstanceData {
+    pub buffer:     WebGlBuffer,
+    pub attributes: &'static [(VertexAttrib, VertexAttribDivisor)],
+    pub count:      i32,
+}
+
 pub fn draw_pass<'a, Uniforms, Meshes, MeshUniforms>(
     gl: &GlContext,
     program: &Program,
     uniforms: Uniforms,
     meshes: Meshes,
+    instances: Option<InstanceData>,
 )
 where
     Uniforms: IntoIterator<Item=&'a (&'a str, UniformValue)>,
@@ -367,7 +379,33 @@ where
             WebGlRenderingContext::ARRAY_BUFFER,
             None);
 
-        gl.draw_arrays(mesh.draw_mode, 0, mesh.count);
+        if let Some(instances) = instances.as_ref() {
+            let gl = gl.webgl2()
+                .expect("instanced rendering requires WebGL 2.0");
+
+            gl.bind_buffer(
+                WebGlRenderingContext::ARRAY_BUFFER,
+                Some(&instances.buffer));
+
+            program.assign_vertex_attribs(gl, instances.attributes.iter().map(|attr| &attr.0));
+            for (attrib, divisor) in instances.attributes {
+                let location_pos = program.vertex_attrib_location(attrib.ident).unwrap();
+                gl.vertex_attrib_divisor(location_pos, divisor.0);
+            }
+
+            gl.bind_buffer(
+                WebGlRenderingContext::ARRAY_BUFFER,
+                None);
+
+            gl.draw_arrays_instanced(mesh.draw_mode, 0, mesh.count, instances.count);
+
+            for (attrib, _) in instances.attributes {
+                let location_pos = program.vertex_attrib_location(attrib.ident).unwrap();
+                gl.vertex_attrib_divisor(location_pos, 0);
+            }
+        } else {
+            gl.draw_arrays(mesh.draw_mode, 0, mesh.count);
+        }
 
         program.clear_vertex_attribs(gl);
     }
@@ -590,7 +628,7 @@ pub struct WarpEffect {
     particles_init: WebGlBuffer,
     particles: [WebGlBuffer; WARP_EFFECT_FRAMES],
     frame: usize,
-    line: WebGlBuffer,
+    line: Mesh,
     phys_program: Program,
     draw_program: Program,
 }
@@ -650,13 +688,30 @@ impl WarpEffect {
                 WebGl2RenderingContext::DYNAMIC_COPY);
         }
 
+        const LINE_ATTRIBS: [VertexAttrib; 1] = [
+            VertexAttrib {
+                ident: "u",
+                size: 1,
+                type_: WebGlRenderingContext::FLOAT,
+                normalized: false,
+                stride: 4,
+                offset: 0,
+            }];
+
+        let line = Mesh{
+            vertices: gl.create_buffer().unwrap(),
+            attributes: &LINE_ATTRIBS,
+            draw_mode: WebGlRenderingContext::LINES,
+            count: 2,
+        };
+
         let data = [
             0f32,
             1f32,
         ];
 
-        let line = gl.create_buffer().unwrap();
-        gl.bind_buffer(WebGl2RenderingContext::ARRAY_BUFFER, Some(&line));
+        gl.bind_buffer(WebGl2RenderingContext::ARRAY_BUFFER, Some(&line.vertices));
+
         unsafe {
             let view = Uint8Array::view(get_byte_view(&data));
             gl.buffer_data_with_array_buffer_view(
@@ -771,61 +826,33 @@ impl WarpEffect {
             WebGl2RenderingContext::TRANSFORM_FEEDBACK_BUFFER,
             0, None);
 
-        self.draw_program.use_program(gl);
-
-        self.draw_program.set_uniform(gl, "trail", &UniformValue::Vector3(vel * self.trail_length));
-        self.draw_program.set_uniform(gl, "V", &UniformValue::Matrix4(*view_matrix));
-        self.draw_program.set_uniform(gl, "P", &UniformValue::Matrix4(*projection_matrix));
-
-        gl.bind_buffer(
-            WebGlRenderingContext::ARRAY_BUFFER,
-            Some(&self.particles[i1]));
-
-        self.draw_program.assign_vertex_attribs(gl, 
-            &[
-                VertexAttrib {
-                    ident: "pos",
-                    size: 3,
-                    type_: WebGlRenderingContext::FLOAT,
-                    normalized: false,
-                    stride: 12,
-                    offset: 0,
-                }
-            ]
-        );
-        let location_pos = self.draw_program.vertex_attrib_location("pos").unwrap();
-        gl.vertex_attrib_divisor(location_pos, 1);
-
-        gl.bind_buffer(
-            WebGlRenderingContext::ARRAY_BUFFER,
-            Some(&self.line));
-
-        self.draw_program.assign_vertex_attribs(gl, 
-            &[
-                VertexAttrib {
-                    ident: "u",
-                    size: 1,
-                    type_: WebGlRenderingContext::FLOAT,
-                    normalized: false,
-                    stride: 4,
-                    offset: 0,
-                }
-            ]);
-
-        gl.bind_buffer(
-            WebGlRenderingContext::ARRAY_BUFFER,
-            None);
+        self.phys_program.clear_vertex_attribs(gl);
 
         gl.enable(WebGl2RenderingContext::BLEND);
         gl.blend_func(
                 WebGlRenderingContext::ONE_MINUS_DST_COLOR,
                 WebGlRenderingContext::ZERO);
 
-        gl.draw_arrays_instanced(WebGlRenderingContext::LINES, 0, 2, n);
+        draw_pass(gl, &self.draw_program, &[
+                ("trail", UniformValue::Vector3(vel * self.trail_length)),
+                ("V"    , UniformValue::Matrix4(*view_matrix)),
+                ("P"    , UniformValue::Matrix4(*projection_matrix)),
+            ], vec![
+                (&[], self.line.clone()),
+            ], Some(InstanceData{
+                buffer:     self.particles[i1].clone(),
+                attributes: &[
+                    (VertexAttrib {
+                        ident: "pos",
+                        size: 3,
+                        type_: WebGlRenderingContext::FLOAT,
+                        normalized: false,
+                        stride: 12,
+                        offset: 0,
+                    }, VertexAttribDivisor(1))],
+                count: n,
+            }));
 
         gl.disable(WebGl2RenderingContext::BLEND);
-
-        gl.vertex_attrib_divisor(location_pos, 0);
-        self.draw_program.clear_vertex_attribs(gl);
     }
 }

@@ -143,7 +143,7 @@ impl Environment for Runway {
                 ("V", UniformValue::Matrix4(*view_matrix)),
                 ("P", UniformValue::Matrix4(*projection_matrix)),
                 ("fog_color", UniformValue::Color(fog_color)),
-            ], objects);
+            ], objects, None);
         }
     }
 }

@@ -30,13 +30,18 @@ use web_sys::{
     WebGlUniformLocation,
 };
 
+pub trait VersionedContext {
+    fn webgl1(&self) -> Option<&WebGlRenderingContext>;
+    fn webgl2(&self) -> Option<&WebGl2RenderingContext>;
+}
+
 macro_rules! impl_webgl_trait {
     ($trait_name:ident implementors {$($implementor:ident;)*} methods {$(fn $method:ident($($arg_name:ident: $arg_type:ty),*) -> $result_type:ty;)*}) => {
         impl_webgl_trait!{trait $trait_name {$(fn $method($($arg_name: $arg_type),*) -> $result_type;)*}}
         impl_webgl_trait!{impl $trait_name implementors {$($implementor;)*} methods {$(fn $method($($arg_name: $arg_type),*) -> $result_type;)*}}
     };
     (trait $trait_name:ident {$(fn $method:ident($($arg_name:ident: $arg_type:ty),*) -> $result_type:ty;)*}) => {
-        pub trait $trait_name {
+        pub trait $trait_name: VersionedContext {
             $(
                 fn $method(&self, $($arg_name: $arg_type),*) -> $result_type;
             )*
@@ -101,6 +106,16 @@ impl_webgl_trait!{
     }
 }
 
+impl VersionedContext for WebGlRenderingContext {
+    fn webgl1(&self) -> Option<&WebGlRenderingContext> { Some(&self) }
+    fn webgl2(&self) -> Option<&WebGl2RenderingContext> { None }
+}
+
+impl VersionedContext for WebGl2RenderingContext {
+    fn webgl1(&self) -> Option<&WebGlRenderingContext> { None }
+    fn webgl2(&self) -> Option<&WebGl2RenderingContext> { Some(&self) }
+}
+
 pub enum AnyGlContext {
     Gl1(WebGlRenderingContext),
     Gl2(WebGl2RenderingContext),
@@ -111,6 +126,24 @@ impl AnyGlContext {
         match self {
             AnyGlContext::Gl1(gl) => gl,
             AnyGlContext::Gl2(gl) => gl,
+        }
+    }
+}
+
+impl VersionedContext for AnyGlContext {
+    fn webgl1(&self) -> Option<&WebGlRenderingContext> {
+        if let AnyGlContext::Gl1(gl) = &self {
+            Some(gl)
+        } else {
+            None
+        }
+    }
+
+    fn webgl2(&self) -> Option<&WebGl2RenderingContext> {
+        if let AnyGlContext::Gl2(gl) = &self {
+            Some(gl)
+        } else {
+            None
         }
     }
 }
