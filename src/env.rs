@@ -16,12 +16,26 @@
  */
 
 use crate::gl_context::GlContext;
-use crate::gfx::{Color, draw_pass, gen_box, Mesh, Program, UniformValue};
+use crate::gfx::{
+    build_vbo,
+    Color,
+    Constant,
+    ConstantValue,
+    draw_pass,
+    gen_box,
+    InstanceData,
+    Mesh,
+    Program,
+    VertexAttrib,
+    VERTEX_ATTRIB_DEFAULT,
+};
 use crate::player::{PlayerState, PLAYER_RADIUS};
 
+use cgmath::prelude::*;
 use rand::prelude::*;
 
 use cgmath::{Matrix4, Point3, Rad, Vector3};
+use web_sys::WebGlRenderingContext;
 
 pub trait Environment {
     fn atmosphere_color(&self) -> Color;
@@ -36,13 +50,18 @@ pub trait Environment {
 const WALL_THICKNESS: f32 = 8.0;
 const BOX_WIDTH: f32 = 128.0;
 
+enum InstanceTransforms {
+    Instanced(InstanceData),
+    Fallback(Vec<Matrix4<f32>>),
+}
+
 pub struct Runway {
     length: f32,
     width: f32,
     floor_mesh: Mesh,
     wall_mesh: Mesh,
     scenery_mesh: Mesh,
-    scenery_transforms: Vec<Matrix4<f32>>,
+    scenery_transforms: InstanceTransforms,
 }
 
 impl Runway {
@@ -52,7 +71,7 @@ impl Runway {
             let x = (width + 1.414 * BOX_WIDTH) / 2.0 + WALL_THICKNESS + 32.0;
             let xs = [-x, x];
             let mut rng = rand::thread_rng();
-            (0..n)
+            let data: Vec<_> = (0..n)
                 .flat_map(|i| {
                     let y = (i as f32) * length / (n as f32) - length / 2.0;
                     xs.iter()
@@ -65,7 +84,26 @@ impl Runway {
                             Matrix4::from_translation(offset) * Matrix4::from_angle_z(angle)
                         })
                 })
-                .collect()
+                .collect();
+            if gl.webgl2().is_some() {
+                let instance = InstanceData{
+                    buffer: build_vbo(gl, data.as_slice()).unwrap(),
+                    attributes: &[
+                        VertexAttrib {
+                            ident: "M_instance",
+                            size: 16,
+                            type_: WebGlRenderingContext::FLOAT,
+                            stride: 64,
+                            divisor: 1,
+                            ..VERTEX_ATTRIB_DEFAULT
+                        },
+                    ],
+                    count: data.len() as i32,
+                };
+                InstanceTransforms::Instanced(instance)
+            } else {
+                InstanceTransforms::Fallback(data)
+            }
         };
         Some(Self{
             length, width,
@@ -117,33 +155,51 @@ impl Environment for Runway {
     {
         for &y in &[0.0, -self.length, self.length] {
             let offset_matrix = Matrix4::from_translation(Vector3::new(0.0, y, 0.0));
-            let floor_uniforms = [("M", UniformValue::Matrix4(offset_matrix))];
-            let wall0_uniforms = [
-                ("M", UniformValue::Matrix4(Matrix4::from_translation(
-                    Vector3::new(-(self.width + WALL_THICKNESS)/2.0, y, 0.0))))];
-            let wall1_uniforms = [
-                ("M", UniformValue::Matrix4(Matrix4::from_translation(
-                    Vector3::new((self.width + WALL_THICKNESS)/2.0, y, 0.0))))];
-            let mut objects = vec![
-                (&floor_uniforms, self.floor_mesh.clone()),
-                (&wall0_uniforms, self.wall_mesh.clone()),
-                (&wall1_uniforms, self.wall_mesh.clone()),
+
+            let draw_objects = |objects: Vec<(&[(&str, Constant)], Mesh, Option<&InstanceData>)>| {
+                let fog_color = self.atmosphere_color();
+                draw_pass(gl, program, &[
+                    ("V"        , Constant::Uniform(ConstantValue::Matrix4(*view_matrix))),
+                    ("P"        , Constant::Uniform(ConstantValue::Matrix4(*projection_matrix))),
+                    ("fog_color", Constant::Uniform(ConstantValue::Color(fog_color))),
+                    ("M_group"  , Constant::Uniform(ConstantValue::Matrix4(offset_matrix))),
+                ], objects);
+            };
+
+            let floor_constants = [
+                ("M_instance", Constant::VertexAttrib(ConstantValue::Matrix4(Matrix4::identity()))),
             ];
-            let scenery = self.scenery_transforms.iter()
-                .map(|m| {
-                    [("M", UniformValue::Matrix4(offset_matrix * m))]
-                })
-                .collect::<Vec<_>>();
-            objects.extend(scenery.iter()
-                .map(|uniforms| {
-                    (uniforms, self.scenery_mesh.clone())
-                }));
-            let fog_color = self.atmosphere_color();
-            draw_pass(gl, program, &[
-                ("V", UniformValue::Matrix4(*view_matrix)),
-                ("P", UniformValue::Matrix4(*projection_matrix)),
-                ("fog_color", UniformValue::Color(fog_color)),
-            ], objects, None);
+            let wall0_constants = [
+                ("M_instance", Constant::VertexAttrib(ConstantValue::Matrix4(
+                    Matrix4::from_translation(Vector3::unit_x() * -(self.width + WALL_THICKNESS)/2.0)))),
+            ];
+            let wall1_constants = [
+                ("M_instance", Constant::VertexAttrib(ConstantValue::Matrix4(
+                    Matrix4::from_translation(Vector3::unit_x() * (self.width + WALL_THICKNESS)/2.0)))),
+            ];
+            let mut objects: Vec<(&[_], _, _)> = vec![
+                (&floor_constants, self.floor_mesh.clone(), None),
+                (&wall0_constants, self.wall_mesh.clone(), None),
+                (&wall1_constants, self.wall_mesh.clone(), None),
+            ];
+            match &self.scenery_transforms {
+                InstanceTransforms::Instanced(instance_data) => {
+                    objects.push((&[], self.scenery_mesh.clone(), Some(instance_data)));
+                    draw_objects(objects);
+                }
+                InstanceTransforms::Fallback(transforms) => {
+                    let scenery = transforms.iter()
+                        .map(|m| {
+                            [("M_instance", Constant::VertexAttrib(ConstantValue::Matrix4(*m)))]
+                        })
+                        .collect::<Vec<_>>();
+                    objects.extend(scenery.iter()
+                        .map(|constants| -> (&[_], _, _) {
+                            (constants, self.scenery_mesh.clone(), None)
+                        }));
+                    draw_objects(objects);
+                }
+            }
         }
     }
 }

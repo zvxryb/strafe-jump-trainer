@@ -123,7 +123,7 @@ fn build_program(gl: &GlContext, source_vs: &str, source_fs: &str)
     Some(program)
 }
 
-fn build_vbo<T>(gl: &GlContext, data: &[T]) -> Option<WebGlBuffer>
+pub fn build_vbo<T>(gl: &GlContext, data: &[T]) -> Option<WebGlBuffer>
 where
     T: 'static + Sized + Copy + Send + Sync
 {
@@ -146,24 +146,31 @@ struct ProgramData {
 }
 
 impl ProgramData {
-    fn simple_type(&self) -> (u32, i32) {
+    fn type_info(&self) -> (u32, i32, i32, i32) {
         match self.type_ {
-            WebGlRenderingContext::FLOAT      => (WebGlRenderingContext::FLOAT,      self.size),
-            WebGlRenderingContext::FLOAT_VEC2 => (WebGlRenderingContext::FLOAT,  2 * self.size),
-            WebGlRenderingContext::FLOAT_VEC3 => (WebGlRenderingContext::FLOAT,  3 * self.size),
-            WebGlRenderingContext::FLOAT_VEC4 => (WebGlRenderingContext::FLOAT,  4 * self.size),
-            WebGlRenderingContext::FLOAT_MAT4 => (WebGlRenderingContext::FLOAT, 16 * self.size),
+            WebGlRenderingContext::FLOAT      => (WebGlRenderingContext::FLOAT, 4, 1, self.size),
+            WebGlRenderingContext::FLOAT_VEC2 => (WebGlRenderingContext::FLOAT, 4, 2, self.size),
+            WebGlRenderingContext::FLOAT_VEC3 => (WebGlRenderingContext::FLOAT, 4, 3, self.size),
+            WebGlRenderingContext::FLOAT_VEC4 => (WebGlRenderingContext::FLOAT, 4, 4, self.size),
+            WebGlRenderingContext::FLOAT_MAT4 => (WebGlRenderingContext::FLOAT, 4, 4, 4 * self.size),
             _ => panic!("unrecognized type")
         }
     }
 }
 
-pub enum UniformValue {
+#[derive(Clone)]
+pub enum ConstantValue {
     Color(Color),
     Float(f32),
     Vector2(Vector2<f32>),
     Vector3(Vector3<f32>),
     Matrix4(Matrix4<f32>),
+}
+
+#[derive(Clone)]
+pub enum Constant {
+    Uniform(ConstantValue),
+    VertexAttrib(ConstantValue),
 }
 
 pub struct Program {
@@ -214,12 +221,6 @@ impl Program {
         gl.use_program(Some(&self.program));
     }
 
-    fn vertex_attrib_location(&self, name: &str) -> Option<u32> {
-        self.attributes.iter()
-            .find(|(attrib, _)| attrib.name == name)
-            .map(|(_, location)| *location)
-    }
-
     fn assign_vertex_attribs<'a, VertexAttribs>(&self, gl: &GlContext, vertex_attribs: VertexAttribs)
     where
         VertexAttribs: IntoIterator<Item = &'a VertexAttrib>
@@ -228,21 +229,32 @@ impl Program {
             if let Some((program_attrib, location)) = self.attributes.iter()
                 .find(|(attrib, _)| attrib.name == vertex_attrib.ident)
             {
-                let (expected_type, expected_size) = program_attrib.simple_type();
-                if vertex_attrib.type_ == expected_type
-                && vertex_attrib.size  == expected_size {
-                    gl.enable_vertex_attrib_array(*location);
-                    gl.vertex_attrib_pointer_with_i32(*location,
-                        vertex_attrib.size,
-                        vertex_attrib.type_,
-                        vertex_attrib.normalized,
-                        vertex_attrib.stride,
-                        vertex_attrib.offset);
+                let (type_, type_bytes, col_size, cols) = program_attrib.type_info();
+                if vertex_attrib.type_ == type_
+                && vertex_attrib.size  == col_size * cols {
+                    for i in 0..cols {
+                        gl.enable_vertex_attrib_array(*location + i as u32);
+                    }
+                    for i in 0..cols {
+                        gl.vertex_attrib_pointer_with_i32(*location + i as u32,
+                            col_size,
+                            type_,
+                            vertex_attrib.normalized,
+                            vertex_attrib.stride,
+                            vertex_attrib.offset + i * col_size * type_bytes);
+                    }
+                    if let Some(gl) = gl.webgl2() {
+                        for i in 0..cols {
+                            gl.vertex_attrib_divisor(*location + i as u32, vertex_attrib.divisor);
+                        }
+                    } else {
+                        assert_eq!(vertex_attrib.divisor, 0);
+                    }
                 } else {
                     error(format!("vertex data for {} does not match type/size expected by program
                         expected: {:04x}, {}
                         actual  : {:04x}, {}",
-                        program_attrib.name, expected_type, expected_size,
+                        program_attrib.name, type_, col_size * cols,
                         vertex_attrib.type_, vertex_attrib.size).as_str());
                 }
             }
@@ -250,17 +262,68 @@ impl Program {
     }
 
     fn clear_vertex_attribs(&self, gl: &GlContext) {
-        for (_, location) in &self.attributes {
-            gl.disable_vertex_attrib_array(*location);
+        for (attrib, location) in &self.attributes {
+            let (_, _, _, n) = attrib.type_info();
+            for i in 0..n {
+                gl.disable_vertex_attrib_array(*location + i as u32);
+            }
         }
     }
 
-    pub fn set_uniform(&self, gl: &GlContext, name: &str, value: &UniformValue) {
+    pub fn set_attribute(&self, gl: &GlContext, name: &str, value: &ConstantValue) {
+        if let Some((attrib, location)) = self.attributes.iter()
+            .find(|(attrib, _)| attrib.name == name)
+        {
+            match value {
+                ConstantValue::Color(value) => {
+                    assert_eq!(attrib.type_, WebGlRenderingContext::FLOAT_VEC4);
+                    assert_eq!(attrib.size, 1);
+                    gl.vertex_attrib4f(*location,
+                        value.r,
+                        value.g,
+                        value.b,
+                        value.a,
+                    );
+                }
+                ConstantValue::Float(value) => {
+                    assert_eq!(attrib.type_, WebGlRenderingContext::FLOAT);
+                    assert_eq!(attrib.size, 1);
+                    gl.vertex_attrib1f(*location, *value);
+                }
+                ConstantValue::Vector2(value) => {
+                    assert_eq!(attrib.type_, WebGlRenderingContext::FLOAT_VEC2);
+                    assert_eq!(attrib.size, 1);
+                    gl.vertex_attrib2f(*location, value.x, value.y);
+                }
+                ConstantValue::Vector3(value) => {
+                    assert_eq!(attrib.type_, WebGlRenderingContext::FLOAT_VEC3);
+                    assert_eq!(attrib.size, 1);
+                    gl.vertex_attrib3f(*location, value.x, value.y, value.z);
+                }
+                ConstantValue::Matrix4(value) => {
+                    assert_eq!(attrib.type_, WebGlRenderingContext::FLOAT_MAT4);
+                    assert_eq!(attrib.size, 1);
+                    gl.vertex_attrib4fv_with_f32_array(*location,
+                        AsRef::<[f32; 4]>::as_ref(&value[0]));
+                    gl.vertex_attrib4fv_with_f32_array(*location + 1,
+                        AsRef::<[f32; 4]>::as_ref(&value[1]));
+                    gl.vertex_attrib4fv_with_f32_array(*location + 2,
+                        AsRef::<[f32; 4]>::as_ref(&value[2]));
+                    gl.vertex_attrib4fv_with_f32_array(*location + 3,
+                        AsRef::<[f32; 4]>::as_ref(&value[3]));
+                }
+            }
+        } else {
+            panic!("failed to locate attrib for {}", name);
+        }
+    }
+
+    pub fn set_uniform(&self, gl: &GlContext, name: &str, value: &ConstantValue) {
         if let Some((uniform, location)) = self.uniforms.iter()
             .find(|(uniform, _)| uniform.name == name)
         {
             match value {
-                UniformValue::Color(value) => {
+                ConstantValue::Color(value) => {
                     assert_eq!(uniform.type_, WebGlRenderingContext::FLOAT_VEC4);
                     assert_eq!(uniform.size, 1);
                     gl.uniform4f(Some(location),
@@ -270,22 +333,22 @@ impl Program {
                         value.a,
                     );
                 }
-                UniformValue::Float(value) => {
+                ConstantValue::Float(value) => {
                     assert_eq!(uniform.type_, WebGlRenderingContext::FLOAT);
                     assert_eq!(uniform.size, 1);
                     gl.uniform1f(Some(location), *value);
                 }
-                UniformValue::Vector2(value) => {
+                ConstantValue::Vector2(value) => {
                     assert_eq!(uniform.type_, WebGlRenderingContext::FLOAT_VEC2);
                     assert_eq!(uniform.size, 1);
                     gl.uniform2f(Some(location), value.x, value.y);
                 }
-                UniformValue::Vector3(value) => {
+                ConstantValue::Vector3(value) => {
                     assert_eq!(uniform.type_, WebGlRenderingContext::FLOAT_VEC3);
                     assert_eq!(uniform.size, 1);
                     gl.uniform3f(Some(location), value.x, value.y, value.z);
                 }
-                UniformValue::Matrix4(value) => {
+                ConstantValue::Matrix4(value) => {
                     assert_eq!(uniform.type_, WebGlRenderingContext::FLOAT_MAT4);
                     assert_eq!(uniform.size, 1);
                     gl.uniform_matrix4fv_with_f32_array(Some(location), false,
@@ -296,16 +359,35 @@ impl Program {
             panic!("failed to locate uniform for {}", name);
         }
     }
+
+    pub fn set_constant(&self, gl: &GlContext, name: &str, value: &Constant) {
+        match value {
+            Constant::Uniform     (value) => { self.set_uniform  (gl, name, &value) }
+            Constant::VertexAttrib(value) => { self.set_attribute(gl, name, &value) }
+        }
+    }
 }
 
+#[derive(Clone)]
 pub struct VertexAttrib {
-    ident: &'static str,
-    size: i32,
-    type_: u32,
-    normalized: bool,
-    stride: i32,
-    offset: i32,
+    pub ident: &'static str,
+    pub size: i32,
+    pub type_: u32,
+    pub normalized: bool,
+    pub stride: i32,
+    pub offset: i32,
+    pub divisor: u32,
 }
+
+pub const VERTEX_ATTRIB_DEFAULT: VertexAttrib = VertexAttrib{
+    ident: "",
+    size: 0,
+    type_: WebGlRenderingContext::FLOAT,
+    normalized: false,
+    stride: 0,
+    offset: 0,
+    divisor: 0,
+};
 
 pub trait VertexLayout: 'static + Sized + Copy + Send + Sync {
     fn attribs() -> &'static [VertexAttrib];
@@ -334,39 +416,36 @@ impl Mesh {
     }
 }
 
-pub struct VertexAttribDivisor(u32);
-
 pub struct InstanceData {
     pub buffer:     WebGlBuffer,
-    pub attributes: &'static [(VertexAttrib, VertexAttribDivisor)],
+    pub attributes: &'static [VertexAttrib],
     pub count:      i32,
 }
 
-pub fn draw_pass<'a, Uniforms, Meshes, MeshUniforms>(
+pub fn draw_pass<'a, Constants, Meshes, MeshConstants>(
     gl: &GlContext,
     program: &Program,
-    uniforms: Uniforms,
+    constants: Constants,
     meshes: Meshes,
-    instances: Option<InstanceData>,
 )
 where
-    Uniforms: IntoIterator<Item=&'a (&'a str, UniformValue)>,
-    Meshes: IntoIterator<Item=(MeshUniforms, Mesh)>,
-    MeshUniforms: IntoIterator<Item=&'a (&'a str, UniformValue)>,
+    Constants: IntoIterator<Item=&'a (&'a str, Constant)>,
+    Meshes: IntoIterator<Item=(MeshConstants, Mesh, Option<&'a InstanceData>)>,
+    MeshConstants: IntoIterator<Item=&'a (&'a str, Constant)>,
 {
     program.use_program(gl);
 
-    for uniform in uniforms.into_iter() {
-        let (name, value) = uniform;
-        program.set_uniform(gl, name, &value);
+    for constant in constants.into_iter() {
+        let (name, value) = constant;
+        program.set_constant(gl, name, &value);
     }
 
     for mesh in meshes.into_iter() {
-        let (uniforms, mesh) = mesh;
+        let (constants, mesh, instances) = mesh;
 
-        for uniform in uniforms.into_iter() {
-            let (name, value) = uniform;
-            program.set_uniform(gl, name, &value);
+        for constant in constants.into_iter() {
+            let (name, value) = constant;
+            program.set_constant(gl, name, &value);
         }
 
         gl.bind_buffer(
@@ -387,22 +466,13 @@ where
                 WebGlRenderingContext::ARRAY_BUFFER,
                 Some(&instances.buffer));
 
-            program.assign_vertex_attribs(gl, instances.attributes.iter().map(|attr| &attr.0));
-            for (attrib, divisor) in instances.attributes {
-                let location_pos = program.vertex_attrib_location(attrib.ident).unwrap();
-                gl.vertex_attrib_divisor(location_pos, divisor.0);
-            }
+            program.assign_vertex_attribs(gl, instances.attributes);
 
             gl.bind_buffer(
                 WebGlRenderingContext::ARRAY_BUFFER,
                 None);
 
             gl.draw_arrays_instanced(mesh.draw_mode, 0, mesh.count, instances.count);
-
-            for (attrib, _) in instances.attributes {
-                let location_pos = program.vertex_attrib_location(attrib.ident).unwrap();
-                gl.vertex_attrib_divisor(location_pos, 0);
-            }
         } else {
             gl.draw_arrays(mesh.draw_mode, 0, mesh.count);
         }
@@ -451,25 +521,25 @@ impl VertexLayout for MeshVertex {
                 ident: "pos",
                 size: 3,
                 type_: WebGlRenderingContext::FLOAT,
-                normalized: false,
                 stride: 32,
                 offset: 0,
+                ..VERTEX_ATTRIB_DEFAULT
             },
             VertexAttrib {
                 ident: "norm",
                 size: 3,
                 type_: WebGlRenderingContext::FLOAT,
-                normalized: false,
                 stride: 32,
                 offset: 12,
+                ..VERTEX_ATTRIB_DEFAULT
             },
             VertexAttrib {
                 ident: "uv",
                 size: 2,
                 type_: WebGlRenderingContext::FLOAT,
-                normalized: false,
                 stride: 32,
                 offset: 24,
+                ..VERTEX_ATTRIB_DEFAULT
             }
         ];
         &ATTRIBS
@@ -538,9 +608,8 @@ impl VertexLayout for HudVertex {
                 ident: "pos",
                 size: 2,
                 type_: WebGlRenderingContext::FLOAT,
-                normalized: false,
                 stride: 8,
-                offset: 0,
+                ..VERTEX_ATTRIB_DEFAULT
             },
         ];
         &ATTRIBS
@@ -688,38 +757,28 @@ impl WarpEffect {
                 WebGl2RenderingContext::DYNAMIC_COPY);
         }
 
+        gl.bind_buffer(WebGl2RenderingContext::ARRAY_BUFFER, None);
+
         const LINE_ATTRIBS: [VertexAttrib; 1] = [
             VertexAttrib {
                 ident: "u",
                 size: 1,
                 type_: WebGlRenderingContext::FLOAT,
-                normalized: false,
                 stride: 4,
-                offset: 0,
+                ..VERTEX_ATTRIB_DEFAULT
             }];
-
-        let line = Mesh{
-            vertices: gl.create_buffer().unwrap(),
-            attributes: &LINE_ATTRIBS,
-            draw_mode: WebGlRenderingContext::LINES,
-            count: 2,
-        };
 
         let data = [
             0f32,
             1f32,
         ];
 
-        gl.bind_buffer(WebGl2RenderingContext::ARRAY_BUFFER, Some(&line.vertices));
-
-        unsafe {
-            let view = Uint8Array::view(get_byte_view(&data));
-            gl.buffer_data_with_array_buffer_view(
-                WebGl2RenderingContext::ARRAY_BUFFER, &view,
-                WebGl2RenderingContext::DYNAMIC_COPY);
-        }
-
-        gl.bind_buffer(WebGl2RenderingContext::ARRAY_BUFFER, None);
+        let line = Mesh{
+            vertices: build_vbo(gl, &data).unwrap(),
+            attributes: &LINE_ATTRIBS,
+            draw_mode: WebGlRenderingContext::LINES,
+            count: 2,
+        };
 
         let phys_program = {
             let transform_feedback_varyings = js_sys::Array::new();
@@ -771,8 +830,8 @@ impl WarpEffect {
 
         self.phys_program.use_program(gl);
 
-        self.phys_program.set_uniform(gl, "motion", &UniformValue::Vector3(-vel * dt));
-        self.phys_program.set_uniform(gl, "radius", &UniformValue::Float(self.radius));
+        self.phys_program.set_uniform(gl, "motion", &ConstantValue::Vector3(-vel * dt));
+        self.phys_program.set_uniform(gl, "radius", &ConstantValue::Float(self.radius));
 
         gl.bind_buffer(
             WebGlRenderingContext::ARRAY_BUFFER,
@@ -784,9 +843,8 @@ impl WarpEffect {
                     ident: "in_pos_0",
                     size: 3,
                     type_: WebGlRenderingContext::FLOAT,
-                    normalized: false,
                     stride: 12,
-                    offset: 0,
+                    ..VERTEX_ATTRIB_DEFAULT
                 }
             ]
         );
@@ -801,9 +859,8 @@ impl WarpEffect {
                     ident: "in_pos",
                     size: 3,
                     type_: WebGlRenderingContext::FLOAT,
-                    normalized: false,
                     stride: 12,
-                    offset: 0,
+                    ..VERTEX_ATTRIB_DEFAULT
                 }
             ]
         );
@@ -833,25 +890,27 @@ impl WarpEffect {
                 WebGlRenderingContext::ONE_MINUS_DST_COLOR,
                 WebGlRenderingContext::ZERO);
 
-        draw_pass(gl, &self.draw_program, &[
-                ("trail", UniformValue::Vector3(vel * self.trail_length)),
-                ("V"    , UniformValue::Matrix4(*view_matrix)),
-                ("P"    , UniformValue::Matrix4(*projection_matrix)),
-            ], vec![
-                (&[], self.line.clone()),
-            ], Some(InstanceData{
-                buffer:     self.particles[i1].clone(),
+        let instances = InstanceData{
+                buffer: self.particles[i1].clone(),
                 attributes: &[
-                    (VertexAttrib {
+                    VertexAttrib {
                         ident: "pos",
                         size: 3,
                         type_: WebGlRenderingContext::FLOAT,
-                        normalized: false,
                         stride: 12,
-                        offset: 0,
-                    }, VertexAttribDivisor(1))],
+                        divisor: 1,
+                        ..VERTEX_ATTRIB_DEFAULT
+                    }],
                 count: n,
-            }));
+            };
+
+        draw_pass(gl, &self.draw_program, &[
+                ("trail", Constant::Uniform(ConstantValue::Vector3(vel * self.trail_length))),
+                ("V"    , Constant::Uniform(ConstantValue::Matrix4(*view_matrix))),
+                ("P"    , Constant::Uniform(ConstantValue::Matrix4(*projection_matrix))),
+            ], vec![
+                (&[], self.line.clone(), Some(&instances)),
+            ]);
 
         gl.disable(WebGl2RenderingContext::BLEND);
     }

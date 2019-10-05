@@ -20,7 +20,9 @@
  * IN THE SOFTWARE.
 */
 
+use wasm_bindgen::JsCast;
 use web_sys::{
+    HtmlCanvasElement,
     WebGlActiveInfo,
     WebGlBuffer,
     WebGlProgram,
@@ -100,6 +102,11 @@ impl_webgl_trait!{
         fn uniform3f(location: Option<&WebGlUniformLocation>, x: f32, y: f32, z: f32) -> ();
         fn uniform4f(location: Option<&WebGlUniformLocation>, x: f32, y: f32, z: f32, w: f32) -> ();
         fn uniform_matrix4fv_with_f32_array(location: Option<&WebGlUniformLocation>, transpose: bool, data: &[f32]) -> ();
+        fn vertex_attrib1f(location: u32, x: f32) -> ();
+        fn vertex_attrib2f(location: u32, x: f32, y: f32) -> ();
+        fn vertex_attrib3f(location: u32, x: f32, y: f32, z: f32) -> ();
+        fn vertex_attrib4f(location: u32, x: f32, y: f32, z: f32, w: f32) -> ();
+        fn vertex_attrib4fv_with_f32_array(location: u32, data: &[f32]) -> ();
         fn use_program(program: Option<&WebGlProgram>) -> ();
         fn viewport(x: i32, y: i32, width: i32, height: i32) -> ();
         fn vertex_attrib_pointer_with_i32(index: u32, size: i32, type_: u32, normalized: bool, stride: i32, offset: i32) -> ();
@@ -116,12 +123,43 @@ impl VersionedContext for WebGl2RenderingContext {
     fn webgl2(&self) -> Option<&WebGl2RenderingContext> { Some(&self) }
 }
 
+pub enum GlVersionRequirement {
+    WebGl1Only,
+    WebGl2Only,
+    Any,
+}
+
 pub enum AnyGlContext {
     Gl1(WebGlRenderingContext),
     Gl2(WebGl2RenderingContext),
 }
 
 impl AnyGlContext {
+    pub fn from_canvas(canvas: &HtmlCanvasElement, version: GlVersionRequirement) -> Option<Self> {
+        match version {
+            GlVersionRequirement::WebGl1Only => {
+                canvas.get_context("webgl")
+                    .ok()
+                    .and_then(|gl| gl)
+                    .map(|gl| {
+                        AnyGlContext::Gl1(gl.dyn_into::<WebGlRenderingContext>().unwrap())
+                    })
+            }
+            GlVersionRequirement::WebGl2Only => {
+                canvas.get_context("webgl2")
+                    .ok()
+                    .and_then(|gl| gl)
+                    .map(|gl| {
+                        AnyGlContext::Gl2(gl.dyn_into::<WebGl2RenderingContext>().unwrap())
+                    })
+            }
+            GlVersionRequirement::Any => {
+                Self::from_canvas(canvas, GlVersionRequirement::WebGl2Only)
+                    .or_else(|| Self::from_canvas(canvas, GlVersionRequirement::WebGl1Only))
+            }
+        }
+    }
+
     pub fn gl(&self) -> &GlContext {
         match self {
             AnyGlContext::Gl1(gl) => gl,

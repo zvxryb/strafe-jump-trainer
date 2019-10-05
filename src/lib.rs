@@ -62,13 +62,14 @@ mod ui;
 
 use ai::{StrafeBot, StrafeConfig};
 use env::{Environment, Runway};
-use gl_context::AnyGlContext;
+use gl_context::{AnyGlContext, GlVersionRequirement};
 use gfx::{
     draw_pass,
     gen_hud_quad,
     Mesh,
     Program,
-    UniformValue,
+    Constant,
+    ConstantValue,
     WarpEffect,
 };
 use input::KeyState;
@@ -149,22 +150,24 @@ const MAIN_VS_SRC: &str = "#version 100
 attribute vec3 pos;
 attribute vec3 norm;
 attribute vec2 uv;
+attribute mat4 M_instance;
 
 varying vec3 f_eye;
 varying vec3 f_norm;
 varying vec2 f_uv;
 
-uniform mat4 M;
+uniform mat4 M_group;
 uniform mat4 V;
 uniform mat4 P;
 
 void main() {
+    mat4 M = M_group * M_instance;
     vec4 world = M * vec4(pos, 1.0);
     vec4 eye = V * world;
     vec4 clip = P * eye;
 
     f_eye = eye.xyz/eye.w;
-    f_norm = norm;
+    f_norm = mat3(M) * norm;
     f_uv = uv;
     gl_Position = clip;
 }
@@ -178,7 +181,6 @@ varying vec3 f_eye;
 varying vec3 f_norm;
 varying vec2 f_uv;
 
-uniform mat4 M;
 uniform vec4 fog_color;
 
 vec3 to_srgb(vec3 x) {
@@ -186,7 +188,7 @@ vec3 to_srgb(vec3 x) {
 }
 
 void main() {
-    vec3 norm = normalize(mat3(M) * f_norm);
+    vec3 norm = normalize(f_norm);
 
     vec3 color;
     vec2 uv = mod(floor(f_uv), 2.0);
@@ -295,20 +297,18 @@ struct Application {
 
 impl Application {
     fn from_ui(ui: UI) -> Self {
-        let gl = ui.canvas.get_context("webgl2")
-            .ok()
-            .and_then(|gl| gl)
-            .map(|gl| {
-                AnyGlContext::Gl2(gl.dyn_into::<WebGl2RenderingContext>().unwrap())
-            })
-            .or_else(||
-                ui.canvas.get_context("webgl")
-                    .ok()
-                    .and_then(|gl| gl)
-                    .map(|gl| {
-                        AnyGlContext::Gl1(gl.dyn_into::<WebGlRenderingContext>().unwrap())
-                    }))
-            .expect("failed to get webgl context");
+        let gl = AnyGlContext::from_canvas(&ui.canvas,
+            GlVersionRequirement::Any)
+            .expect("failed to get WebGL context");
+
+        match &gl {
+            AnyGlContext::Gl1(_) => {
+                warn("running in WebGL 1.0 fallback mode; this may be slow");
+            }
+            AnyGlContext::Gl2(_) => {
+                log("successfully obtained WebGL 2.0 context");
+            }
+        }
 
         let warp_effect = if let AnyGlContext::Gl2(gl) = &gl {
             Some(WarpEffect::new(gl, 25000, 1000.0, 1.0/120.0))
@@ -1053,13 +1053,13 @@ impl Application {
                 WebGlRenderingContext::ONE_MINUS_SRC_ALPHA);
 
             draw_pass(self.gl.gl(), &self.hud_program, &[
-                ("fov"         , UniformValue::Float  (fovx.0     )),
-                ("wish_dir"    , UniformValue::Vector2(wish_dir   )),
-                ("move_dir"    , UniformValue::Vector2(move_dir   )),
-                ("warp_factor" , UniformValue::Float  (warp_factor)),
+                ("fov"         , Constant::Uniform(ConstantValue::Float  (fovx.0     ))),
+                ("wish_dir"    , Constant::Uniform(ConstantValue::Vector2(wish_dir   ))),
+                ("move_dir"    , Constant::Uniform(ConstantValue::Vector2(move_dir   ))),
+                ("warp_factor" , Constant::Uniform(ConstantValue::Float  (warp_factor))),
             ], vec![
-                (&[], self.hud_mesh.clone()),
-            ], None);
+                (&[], self.hud_mesh.clone(), None),
+            ]);
 
             self.gl.gl().disable(WebGlRenderingContext::BLEND);
         }
