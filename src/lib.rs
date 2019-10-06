@@ -389,7 +389,8 @@ impl Application {
                             effective \"dead zone\" \u{2014} a region where the player is not allowed \
                             to continue acceleration.  If the player maintains a movement direction \
                             which is just outside this region, acceleration is allowed to continue.\n\n\
-                            Still don't get it?  No problem, it just takes a bit of practice!"));
+                            This interactive tutorial will guide you through the different mechanics \
+                            required for successful strafe jumping."));
                         self.strafe_bot = None;
                         hide(&self.ui.keys);
                     }
@@ -413,6 +414,11 @@ impl Application {
                         dialog.set_text_content(Some("\
                             We'll begin with hopping practice.  Strafe bot will continue to handle basic \
                             motion, but you will have to press SPACE as indicated on the HUD.\n\n\
+                            The first motion is referred to as a \"circle-jump\", which is a quick turn \
+                            while grounded to gain maximum ground acceleration before jumping.  This works \
+                            because ground acceleration is generally higher than air acceleration, but is \
+                            limited to just over 400UPS by friction.  Once maximum ground speed is reached \
+                            this speed is maintained by repeatedly hopping.\n\n\
                             Reach 1000 UPS to continue."));
                         self.strafe_bot = Some(StrafeBot::new(StrafeConfig::FULL_BEAT));
                         self.auto_hop  = false;
@@ -424,7 +430,12 @@ impl Application {
                     TutorialStage::Moving(..) => {
                         dialog.set_text_content(Some("\
                             Next, let's practice movement keys.  This time you'll have control over \
-                            W/A/S/D, exclusively.  Follow along with the HUD indicators.\n\n\
+                            W/A/S/D, exclusively.  Simply follow along with the HUD indicators.\n\n\
+                            While a player can strafe using any movement key or pair of movement keys \
+                            at any time, the choice of key(s) determines which direction a player faces \
+                            for a chosen direction of motion.  It is possible to strafe backwards, sideways, \
+                            etc.  W/A and W/D are the most common strafe keys enabling a player to travel in \
+                            a mostly-forward direction.  This is commonly referred to as \"full-beat\" strafing.\n\n\
                             Reach 1000 UPS to continue."));
                         self.strafe_bot = Some(StrafeBot::new(StrafeConfig::FULL_BEAT));
                         self.auto_hop  = true;
@@ -435,10 +446,14 @@ impl Application {
                     }
                     TutorialStage::Turning(..) => {
                         dialog.set_text_content(Some("\
-                            Finally, mouse motion.  Begin with a quick turn to the left, then use gradual \
-                            motion to keep your cursor in the green area of the HUD, while Strafe Bot \
-                            handles movement.  Keep the cursor lit up for as much time as possible.\n\n\
-                            Reach 1000 UPS to continue."));
+                            Finally, mouse motion.  This is arguably the most important element of \
+                            strafe jumping, as this angle, in combination with your movement keys, determines \
+                            your intended direction of travel, which must be precisely controlled to gain speed.\n\n\
+                            Begin with a quick turn to the left while grounded (i.e. perform a circle jump motion), \
+                            then, once airborne, use gradual motion to keep your cursor in the green area of the \
+                            HUD, while Strafe Bot handles movement.  Keep the cursor lit up for as much time as \
+                            possible.\n\n\
+                            Reach 1000 UPS to complete tutorial."));
                         self.strafe_bot = Some(StrafeBot::new(StrafeConfig::FULL_BEAT));
                         self.auto_hop  = true;
                         self.auto_move = true;
