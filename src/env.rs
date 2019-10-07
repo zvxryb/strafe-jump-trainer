@@ -67,24 +67,39 @@ pub struct Runway {
 impl Runway {
     pub fn from_dimensions(gl: &GlContext, length: f32, width: f32) -> Option<Self> {
         let scenery_transforms = {
-            let n = (length / 256.0) as u32;
-            let x = (width + 1.414 * BOX_WIDTH) / 2.0 + WALL_THICKNESS + 32.0;
-            let xs = [-x, x];
+            let density: f32 = if gl.webgl2().is_some() { 0.02 } else { 0.0025 };
+            let n = (length * density) as usize;
+            let x0 = (width + 1.414 * BOX_WIDTH) / 2.0 + WALL_THICKNESS + 32.0;
             let mut rng = rand::thread_rng();
-            let data: Vec<_> = (0..n)
-                .flat_map(|i| {
-                    let y = (i as f32) * length / (n as f32) - length / 2.0;
-                    xs.iter()
-                        .map(move |x| {
-                            let offset = Vector3::new(
-                                rng.gen_range(-32.0, 32.0) + x,
-                                rng.gen_range(-32.0, 32.0) + y,
-                                rng.gen_range( 64.0, 96.0));
-                            let angle = Rad(rng.gen_range(-0.5, 0.5));
-                            Matrix4::from_translation(offset) * Matrix4::from_angle_z(angle)
-                        })
-                })
-                .collect();
+            let mut positions = Vec::<(Vector3<f32>, f32)>::with_capacity(n);
+            while positions.len() < n {
+                for &sign in &[1.0, -1.0] {
+                    let scale: f32 = rng.gen_range(1.0, 4.0)
+                                   * rng.gen_range(1.0, 4.0);
+                    let offset = Vector3::new(
+                        sign * scale * x0,
+                        rng.gen_range(-length, length) / 2.0,
+                        rng.gen_range( 64.0, 96.0));
+                    let scale = BOX_WIDTH * scale * rng.gen_range(1.0, 2.0);
+                    let collides = positions.iter().find(|(other_offset, other_scale)| {
+                        other_offset.xy().distance(offset.xy()) <= 1.414 * (scale + other_scale) / 2.0
+                    }).is_some();
+                    if !collides {
+                        positions.push((offset, scale));
+                    }
+                }
+            }
+            // sort nearest first to reduce overdraw:
+            positions.sort_by(|(lhs, _), (rhs, _)| {
+                lhs.x.abs().partial_cmp(&rhs.x.abs()).unwrap_or(std::cmp::Ordering::Equal)
+            });
+            let mut data = Vec::<Matrix4<f32>>::with_capacity(n as usize);
+            data.extend(positions.iter().map(|&(offset, scale)| {
+                let angle = Rad(rng.gen_range(Rad::<f32>::zero().0, Rad::<f32>::full_turn().0));
+                Matrix4::from_translation(offset) *
+                Matrix4::from_angle_z(angle) *
+                Matrix4::from_scale(scale)
+            }));
             if gl.webgl2().is_some() {
                 let instance = InstanceData{
                     buffer: build_vbo(gl, data.as_slice()).unwrap(),
@@ -116,8 +131,8 @@ impl Runway {
                 Point3::new( WALL_THICKNESS / 2.0,  length/2.0, 128.0),
                 64.0)?,
             scenery_mesh: gen_box(gl,
-                Point3::new(-BOX_WIDTH / 2.0, -BOX_WIDTH / 2.0,   0.0),
-                Point3::new( BOX_WIDTH / 2.0,  BOX_WIDTH / 2.0, 256.0),
+                Point3::new(-0.5, -0.5, 0.0),
+                Point3::new( 0.5,  0.5, 2.0),
                 64.0)?,
             scenery_transforms,
         })
