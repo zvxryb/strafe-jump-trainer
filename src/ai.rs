@@ -75,12 +75,12 @@ impl StrafeConfig {
         ..KEYS_DEFAULT
     };
 
-    pub const FULL_BEAT: Self = Self{
+    pub const STANDARD: Self = Self{
         keys_cw : Self::KEYS_WD,
         keys_ccw: Self::KEYS_WA,
     };
 
-    pub const FULL_BEAT_REVERSE: Self = Self{
+    pub const REVERSE: Self = Self{
         keys_cw : Self::KEYS_SA,
         keys_ccw: Self::KEYS_SD,
     };

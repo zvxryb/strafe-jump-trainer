@@ -82,7 +82,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
                 border-right-style: none;
             }
             #strafe_menu h1, #strafe_menu h2 {
-                margin-top: 0.5em;
+                margin-top: 0.3em;
                 margin-bottom: 0;
                 font-variant: small-caps;
                 text-align: center;
@@ -161,12 +161,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
                 width: 60em;
                 white-space: pre-wrap;
                 color: black;
-                font-size: 18pt;
+                font-size: 16pt;
             }
             #strafe_keys {
                 position: absolute;
                 top: 50%;
                 left: 50%;
+                font-size: 10pt;
                 transform: translate(-50%, 100%);
                 color: #202020ff;
             }
@@ -229,6 +230,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
                     <div style="text-align:right;">
                         <label id="strafe_mouse_display" for="strafe_mouse_input"></label>
                     </div>
+                    <div style="margin-top:0.5em;text-align:center;font-size:70%;">(10 &times; [Mouse DPI] is a good starting point)</div>
                 </div>
                 <div id="strafe_menu_movement" class="strafe_hidden">
                     <h2>Movement</h2>
@@ -298,10 +300,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
                                     <select id="strafe_bot_mode">
                                         <option value="unspecified" disabled hidden>Unspecified</option>
                                         <option value="disabled">Disabled</option>
-                                        <option value="full-beat">Full-Beat</option>
-                                        <option value="full-beat-reverse">Full-Beat (Reverse)</option>
-                                        <option value="half-beat-left">Half-Beat (Left)</option>
-                                        <option value="half-beat-right">Half-Beat (Right)</option>
+                                        <option value="standard">Standard (W/A+W/D)</option>
+                                        <option value="reverse">Reverse (S/A+S/D)</option>
+                                        <option value="half-beat-left">Half-Beat, Left (W/A+D)</option>
+                                        <option value="half-beat-right">Half-Beat, Right (A+W/D)</option>
                                     </select>
                                 </td>
                             </tr>

@@ -39,7 +39,6 @@ use web_sys::{
     KeyboardEvent,
     MouseEvent,
     WebGlRenderingContext,
-    WebGl2RenderingContext,
 };
 
 #[wasm_bindgen]
@@ -341,7 +340,7 @@ impl Application {
             },
             player_state: PlayerState::default(),
             kinematics: MOVE_VQ3_LIKE,
-            strafe_bot: Some(StrafeBot::new(StrafeConfig::FULL_BEAT)),
+            strafe_bot: Some(StrafeBot::new(StrafeConfig::STANDARD)),
             auto_hop : true,
             auto_move: true,
             auto_turn: true,
@@ -403,7 +402,7 @@ impl Application {
                             3. Alternates between left-forward and right-forward motion keys\n\
                             4. Keeps his cursor within the green part of the strafe HUD\n\n\
                             When done correctly, the cursor lights up to indicate acceleration"));
-                        self.strafe_bot = Some(StrafeBot::new(StrafeConfig::FULL_BEAT));
+                        self.strafe_bot = Some(StrafeBot::new(StrafeConfig::STANDARD));
                         self.auto_hop  = true;
                         self.auto_move = true;
                         self.auto_turn = true;
@@ -420,7 +419,7 @@ impl Application {
                             limited to just over 400UPS by friction.  Once maximum ground speed is reached \
                             this speed is maintained by repeatedly hopping.\n\n\
                             Reach 1000 UPS to continue."));
-                        self.strafe_bot = Some(StrafeBot::new(StrafeConfig::FULL_BEAT));
+                        self.strafe_bot = Some(StrafeBot::new(StrafeConfig::STANDARD));
                         self.auto_hop  = false;
                         self.auto_move = true;
                         self.auto_turn = true;
@@ -435,9 +434,9 @@ impl Application {
                             at any time, the choice of key(s) determines which direction a player faces \
                             for a chosen direction of motion.  It is possible to strafe backwards, sideways, \
                             etc.  W/A and W/D are the most common strafe keys enabling a player to travel in \
-                            a mostly-forward direction.  This is commonly referred to as \"full-beat\" strafing.\n\n\
+                            a mostly-forward direction.\n\n\
                             Reach 1000 UPS to continue."));
-                        self.strafe_bot = Some(StrafeBot::new(StrafeConfig::FULL_BEAT));
+                        self.strafe_bot = Some(StrafeBot::new(StrafeConfig::STANDARD));
                         self.auto_hop  = true;
                         self.auto_move = false;
                         self.auto_turn = true;
@@ -454,7 +453,7 @@ impl Application {
                             HUD, while Strafe Bot handles movement.  Keep the cursor lit up for as much time as \
                             possible.\n\n\
                             Reach 1000 UPS to complete tutorial."));
-                        self.strafe_bot = Some(StrafeBot::new(StrafeConfig::FULL_BEAT));
+                        self.strafe_bot = Some(StrafeBot::new(StrafeConfig::STANDARD));
                         self.auto_hop  = true;
                         self.auto_move = true;
                         self.auto_turn = false;
@@ -573,10 +572,10 @@ impl Application {
 
     fn update_bot_display(&mut self) {
         self.ui.bot_mode.set_value(match self.strafe_bot {
-            Some(StrafeBot{config: StrafeConfig::FULL_BEAT        , ..}) => "full-beat",
-            Some(StrafeBot{config: StrafeConfig::FULL_BEAT_REVERSE, ..}) => "full-beat-reverse",
-            Some(StrafeBot{config: StrafeConfig::HALF_BEAT_LEFT   , ..}) => "half-beat-left",
-            Some(StrafeBot{config: StrafeConfig::HALF_BEAT_RIGHT  , ..}) => "half-beat-right",
+            Some(StrafeBot{config: StrafeConfig::STANDARD       , ..}) => "standard",
+            Some(StrafeBot{config: StrafeConfig::REVERSE        , ..}) => "reverse",
+            Some(StrafeBot{config: StrafeConfig::HALF_BEAT_LEFT , ..}) => "half-beat-left",
+            Some(StrafeBot{config: StrafeConfig::HALF_BEAT_RIGHT, ..}) => "half-beat-right",
             Some(_) => "unspecified",
             None => "disabled",
         });
@@ -603,11 +602,11 @@ impl Application {
             }
         };
         match self.ui.bot_mode.value().as_str() {
-            "full-beat"         => update_config(&mut self.strafe_bot, StrafeConfig::FULL_BEAT),
-            "full-beat-reverse" => update_config(&mut self.strafe_bot, StrafeConfig::FULL_BEAT_REVERSE),
-            "half-beat-left"    => update_config(&mut self.strafe_bot, StrafeConfig::HALF_BEAT_LEFT),
-            "half-beat-right"   => update_config(&mut self.strafe_bot, StrafeConfig::HALF_BEAT_RIGHT),
-            "disabled"          => { self.strafe_bot = None },
+            "standard"       => update_config(&mut self.strafe_bot, StrafeConfig::STANDARD),
+            "reverse"        => update_config(&mut self.strafe_bot, StrafeConfig::REVERSE),
+            "half-beat-left" => update_config(&mut self.strafe_bot, StrafeConfig::HALF_BEAT_LEFT),
+            "half-beat-right"=> update_config(&mut self.strafe_bot, StrafeConfig::HALF_BEAT_RIGHT),
+            "disabled"       => { self.strafe_bot = None },
             _ => {},
         }
         if self.strafe_bot.is_some() {
