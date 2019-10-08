@@ -80,6 +80,7 @@ impl_webgl_trait!{
         fn create_buffer() -> Option<WebGlBuffer>;
         fn create_program() -> Option<WebGlProgram>;
         fn create_shader(type_: u32) -> Option<WebGlShader>;
+        fn cull_face(face: u32) -> ();
         fn depth_func(func: u32) -> ();
         fn disable(cap: u32) -> ();
         fn disable_vertex_attrib_array(index: u32) -> ();

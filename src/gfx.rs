@@ -303,14 +303,10 @@ impl Program {
                 ConstantValue::Matrix4(value) => {
                     assert_eq!(attrib.type_, WebGlRenderingContext::FLOAT_MAT4);
                     assert_eq!(attrib.size, 1);
-                    gl.vertex_attrib4fv_with_f32_array(*location,
-                        AsRef::<[f32; 4]>::as_ref(&value[0]));
-                    gl.vertex_attrib4fv_with_f32_array(*location + 1,
-                        AsRef::<[f32; 4]>::as_ref(&value[1]));
-                    gl.vertex_attrib4fv_with_f32_array(*location + 2,
-                        AsRef::<[f32; 4]>::as_ref(&value[2]));
-                    gl.vertex_attrib4fv_with_f32_array(*location + 3,
-                        AsRef::<[f32; 4]>::as_ref(&value[3]));
+                    gl.vertex_attrib4f(*location    , value[0].x, value[0].y, value[0].z, value[0].w);
+                    gl.vertex_attrib4f(*location + 1, value[1].x, value[1].y, value[1].z, value[1].w);
+                    gl.vertex_attrib4f(*location + 2, value[2].x, value[2].y, value[2].z, value[2].w);
+                    gl.vertex_attrib4f(*location + 3, value[3].x, value[3].y, value[3].z, value[3].w);
                 }
             }
         } else {
@@ -547,31 +543,40 @@ impl VertexLayout for MeshVertex {
 }
 
 pub fn gen_box(gl: &GlContext, min: Point3<f32>, max: Point3<f32>, uv_scale: f32) -> Option<Mesh> {
-    fn face_uv(min: Point3<f32>, max: Point3<f32>, uv_scale: f32, front: bool) -> Vec<MeshVertex> {
+    fn face_uv(min: Point3<f32>, max: Point3<f32>, uv_scale: f32, front: bool, flip_z: bool) -> Vec<MeshVertex> {
         let mut vs = Vec::new();
-        let z = if front { max.z } else { min.z };
+        let z = if front != flip_z { max.z } else { min.z };
         let nz = if front { 1.0 } else { -1.0 };
         let dx = max.x - min.x;
         let dy = max.y - min.y;
         let duv = Vector2::new(dx, dy) / uv_scale;
         let uv0 = Point2::new(0.0, 0.0);
         let uv1 = uv0 + duv;
-        vs.push(MeshVertex::from_scalars(min.x, min.y, z, 0.0, 0.0, nz, uv0.x, uv0.y));
-        vs.push(MeshVertex::from_scalars(max.x, min.y, z, 0.0, 0.0, nz, uv1.x, uv0.y));
-        vs.push(MeshVertex::from_scalars(max.x, max.y, z, 0.0, 0.0, nz, uv1.x, uv1.y));
-        vs.push(MeshVertex::from_scalars(min.x, min.y, z, 0.0, 0.0, nz, uv0.x, uv0.y));
-        vs.push(MeshVertex::from_scalars(max.x, max.y, z, 0.0, 0.0, nz, uv1.x, uv1.y));
-        vs.push(MeshVertex::from_scalars(min.x, max.y, z, 0.0, 0.0, nz, uv0.x, uv1.y));
+        if front {
+            vs.push(MeshVertex::from_scalars(min.x, min.y, z, 0.0, 0.0, nz, uv0.x, uv0.y));
+            vs.push(MeshVertex::from_scalars(max.x, min.y, z, 0.0, 0.0, nz, uv1.x, uv0.y));
+            vs.push(MeshVertex::from_scalars(max.x, max.y, z, 0.0, 0.0, nz, uv1.x, uv1.y));
+            vs.push(MeshVertex::from_scalars(min.x, min.y, z, 0.0, 0.0, nz, uv0.x, uv0.y));
+            vs.push(MeshVertex::from_scalars(max.x, max.y, z, 0.0, 0.0, nz, uv1.x, uv1.y));
+            vs.push(MeshVertex::from_scalars(min.x, max.y, z, 0.0, 0.0, nz, uv0.x, uv1.y));
+        } else {
+            vs.push(MeshVertex::from_scalars(min.x, min.y, z, 0.0, 0.0, nz, uv0.x, uv0.y));
+            vs.push(MeshVertex::from_scalars(max.x, max.y, z, 0.0, 0.0, nz, uv1.x, uv1.y));
+            vs.push(MeshVertex::from_scalars(max.x, min.y, z, 0.0, 0.0, nz, uv1.x, uv0.y));
+            vs.push(MeshVertex::from_scalars(min.x, min.y, z, 0.0, 0.0, nz, uv0.x, uv0.y));
+            vs.push(MeshVertex::from_scalars(min.x, max.y, z, 0.0, 0.0, nz, uv0.x, uv1.y));
+            vs.push(MeshVertex::from_scalars(max.x, max.y, z, 0.0, 0.0, nz, uv1.x, uv1.y));
+        }
         vs
     }
 
     Mesh::from_vertices(gl, WebGlRenderingContext::TRIANGLES, [
-        face_uv(min.xyz(), max.xyz(), uv_scale, false).into_iter().map(|v| MeshVertex::new(v.pos.xyz(), v.norm.xyz(), v.uv)).collect::<Vec<MeshVertex>>(),
-        face_uv(min.xyz(), max.xyz(), uv_scale, true ).into_iter().map(|v| MeshVertex::new(v.pos.xyz(), v.norm.xyz(), v.uv)).collect::<Vec<MeshVertex>>(),
-        face_uv(min.xzy(), max.xzy(), uv_scale, false).into_iter().map(|v| MeshVertex::new(v.pos.xzy(), v.norm.xzy(), v.uv)).collect::<Vec<MeshVertex>>(),
-        face_uv(min.xzy(), max.xzy(), uv_scale, true ).into_iter().map(|v| MeshVertex::new(v.pos.xzy(), v.norm.xzy(), v.uv)).collect::<Vec<MeshVertex>>(),
-        face_uv(min.zyx(), max.zyx(), uv_scale, false).into_iter().map(|v| MeshVertex::new(v.pos.zyx(), v.norm.zyx(), v.uv)).collect::<Vec<MeshVertex>>(),
-        face_uv(min.zyx(), max.zyx(), uv_scale, true ).into_iter().map(|v| MeshVertex::new(v.pos.zyx(), v.norm.zyx(), v.uv)).collect::<Vec<MeshVertex>>(),
+        face_uv(min.xyz(), max.xyz(), uv_scale, false, false).into_iter().map(|v| MeshVertex::new(v.pos.xyz(), v.norm.xyz(), v.uv)).collect::<Vec<MeshVertex>>(),
+        face_uv(min.xyz(), max.xyz(), uv_scale, true , false).into_iter().map(|v| MeshVertex::new(v.pos.xyz(), v.norm.xyz(), v.uv)).collect::<Vec<MeshVertex>>(),
+        face_uv(min.xzy(), max.xzy(), uv_scale, false, true ).into_iter().map(|v| MeshVertex::new(v.pos.xzy(), v.norm.xzy(), v.uv)).collect::<Vec<MeshVertex>>(),
+        face_uv(min.xzy(), max.xzy(), uv_scale, true , true ).into_iter().map(|v| MeshVertex::new(v.pos.xzy(), v.norm.xzy(), v.uv)).collect::<Vec<MeshVertex>>(),
+        face_uv(min.zyx(), max.zyx(), uv_scale, false, true ).into_iter().map(|v| MeshVertex::new(v.pos.zyx(), v.norm.zyx(), v.uv)).collect::<Vec<MeshVertex>>(),
+        face_uv(min.zyx(), max.zyx(), uv_scale, true , true ).into_iter().map(|v| MeshVertex::new(v.pos.zyx(), v.norm.zyx(), v.uv)).collect::<Vec<MeshVertex>>(),
     ].iter()
         .flatten()
         .cloned()

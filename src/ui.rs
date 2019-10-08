@@ -51,7 +51,9 @@ pub struct UI {
     pub menu_practice: HtmlButtonElement,
     pub mouse_input: HtmlInputElement,
     pub mouse_display: Element,
-    pub menu_movement: HtmlElement,
+    pub practice_options: HtmlElement,
+    pub map_runway: HtmlButtonElement,
+    pub map_freestyle: HtmlButtonElement,
     pub move_vq3_like: HtmlButtonElement,
     pub move_qw_like: HtmlButtonElement,
     pub move_hybrid: HtmlButtonElement,
@@ -106,7 +108,9 @@ pub fn get_ui() -> UI {
     let menu_practice     = get_as::<HtmlButtonElement>(&document, "strafe_menu_practice");
     let mouse_input       = get_as::<HtmlInputElement >(&document, "strafe_mouse_input");
     let mouse_display     = get_as::<Element          >(&document, "strafe_mouse_display");
-    let menu_movement     = get_as::<HtmlElement      >(&document, "strafe_menu_movement");
+    let practice_options  = get_as::<HtmlElement      >(&document, "strafe_practice_options");
+    let map_runway        = get_as::<HtmlButtonElement>(&document, "strafe_map_runway");
+    let map_freestyle     = get_as::<HtmlButtonElement>(&document, "strafe_map_freestyle");
     let move_vq3_like     = get_as::<HtmlButtonElement>(&document, "strafe_move_vq3-like");
     let move_qw_like      = get_as::<HtmlButtonElement>(&document, "strafe_move_qw-like");
     let move_hybrid       = get_as::<HtmlButtonElement>(&document, "strafe_move_hybrid");
@@ -149,7 +153,9 @@ pub fn get_ui() -> UI {
         menu_practice,
         mouse_input,
         mouse_display,
-        menu_movement,
+        practice_options,
+        map_runway,
+        map_freestyle,
         move_vq3_like,
         move_qw_like,
         move_hybrid,

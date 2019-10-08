@@ -51,6 +51,7 @@ extern {
     fn error(_: &str);
 }
 
+mod collision;
 mod env;
 mod gl_context;
 mod gfx;
@@ -60,7 +61,7 @@ mod ai;
 mod ui;
 
 use ai::{StrafeBot, StrafeConfig};
-use env::{Environment, Runway};
+use env::{Map, Freestyle, Runway};
 use gl_context::{AnyGlContext, GlVersionRequirement};
 use gfx::{
     draw_pass,
@@ -123,6 +124,12 @@ impl TutorialStage {
             TutorialStage::Turning(..) => None,
         }
     }
+}
+
+#[derive(PartialEq, Copy, Clone)]
+enum MapOption {
+    Runway,
+    Freestyle,
 }
 
 fn show(element: &Element) {
@@ -201,7 +208,9 @@ void main() {
     color *= 0.5 * dot(norm, light) + 0.5;
 
     vec4 fog = fog_color;
-    fog.a = 1.0 - exp(-fog.a * length(f_eye));
+    fog.a *= length(f_eye);
+    fog.a *= fog.a;
+    fog.a  = 1.0 - exp(-fog.a);
 
     // at least fog will be gamma-correct...
     color = to_srgb(mix(color, fog.rgb, fog.a));
@@ -287,7 +296,8 @@ struct Application {
     last_frame_us: u32,
     tick_remainder_s: f32,
     framerate: f32,
-    environment: Box<Environment>,
+    map_option: MapOption,
+    map: Box<Map>,
     warp_effect: Option<WarpEffect>,
     main_program: Program,
     hud_program: Program,
@@ -315,8 +325,7 @@ impl Application {
             None
         };
 
-        let environment = Box::new(Runway::from_dimensions(gl.gl(), 16384.0, 2048.0)
-            .expect("failed to create environment"));
+        let map = Box::new(Runway::new(gl.gl()));
 
         let main_program = Program::from_source(gl.gl(), MAIN_VS_SRC, MAIN_FS_SRC)
             .expect("failed to build main shader program");
@@ -347,7 +356,7 @@ impl Application {
             menu_shown: true,
             have_pointer: false,
             input_rotation: (Rad::zero(), Rad::zero()),
-            mouse_scale: Rad(0.001),
+            mouse_scale: Rad(0.000_785),
             key_state:       KeyState::default(),
             key_history:     KeyState::default(),
             input_key_state: KeyState::default(),
@@ -356,7 +365,8 @@ impl Application {
             last_frame_us: 0,
             tick_remainder_s: 0.0,
             framerate: 0.0,
-            environment,
+            map_option: MapOption::Runway,
+            map,
             warp_effect,
             main_program,
             hud_program,
@@ -391,6 +401,7 @@ impl Application {
                             This interactive tutorial will guide you through the different mechanics \
                             required for successful strafe jumping."));
                         self.strafe_bot = None;
+                        self.update_bot_display();
                         hide(&self.ui.keys);
                     }
                     TutorialStage::Observe(..) => {
@@ -461,11 +472,12 @@ impl Application {
                         show(&self.ui.keys);
                     }
                 };
-                show(self.ui.menu_continue.dyn_ref::<Element>().unwrap());
-                hide(self.ui.menu_tutorial.dyn_ref::<Element>().unwrap());
-                show(self.ui.menu_practice.dyn_ref::<Element>().unwrap());
-                hide(self.ui.menu_movement.dyn_ref::<Element>().unwrap());
-                hide(self.ui.menu_bot     .dyn_ref::<Element>().unwrap());
+                self.set_map(MapOption::Runway);
+                show(self.ui.menu_continue   .dyn_ref::<Element>().unwrap());
+                hide(self.ui.menu_tutorial   .dyn_ref::<Element>().unwrap());
+                show(self.ui.menu_practice   .dyn_ref::<Element>().unwrap());
+                hide(self.ui.practice_options.dyn_ref::<Element>().unwrap());
+                hide(self.ui.menu_bot        .dyn_ref::<Element>().unwrap());
             },
             None => {
                 dialog.set_text_content(None);
@@ -474,11 +486,11 @@ impl Application {
                 self.auto_move = false;
                 self.auto_turn = false;
                 self.update_bot_display();
-                show(self.ui.menu_continue.dyn_ref::<Element>().unwrap());
-                show(self.ui.menu_tutorial.dyn_ref::<Element>().unwrap());
-                hide(self.ui.menu_practice.dyn_ref::<Element>().unwrap());
-                show(self.ui.menu_movement.dyn_ref::<Element>().unwrap());
-                show(self.ui.menu_bot     .dyn_ref::<Element>().unwrap());
+                show(self.ui.menu_continue   .dyn_ref::<Element>().unwrap());
+                show(self.ui.menu_tutorial   .dyn_ref::<Element>().unwrap());
+                hide(self.ui.menu_practice   .dyn_ref::<Element>().unwrap());
+                show(self.ui.practice_options.dyn_ref::<Element>().unwrap());
+                show(self.ui.menu_bot        .dyn_ref::<Element>().unwrap());
                 hide(&self.ui.keys);
             },
         };
@@ -499,6 +511,20 @@ impl Application {
         self.ui.mouse_input.set_value_as_number(f64::from(sense.0.log2()));
         self.ui.mouse_display.dyn_ref::<web_sys::Node>().unwrap().set_text_content(
             Some(format!("{:.0} counts/rotation", Rad::<f32>::full_turn() / sense).as_str()));
+    }
+
+    fn set_map(&mut self, map: MapOption) {
+        if self.map_option == map { return; }
+        self.map_option = map;
+        self.map = match map {
+            MapOption::Runway    => Box::new(Runway   ::new(self.gl.gl())),
+            MapOption::Freestyle => Box::new(Freestyle::new(self.gl.gl())),
+        };
+        if map == MapOption::Runway && self.stage.is_none() {
+            show(self.ui.menu_bot.dyn_ref::<Element>().unwrap());
+        } else {
+            hide(self.ui.menu_bot.dyn_ref::<Element>().unwrap());
+        }
     }
 
     fn update_movement_display(&mut self) {
@@ -779,11 +805,7 @@ impl Application {
         let practice_cb = {
             let app = app.clone();
             Closure::wrap(Box::new(move || {
-                let root_node = app.borrow().ui.root_node.clone();
                 app.borrow_mut().set_stage(None);
-                app.borrow_mut().hide_menu();
-                let _ = root_node.request_fullscreen();
-                root_node.request_pointer_lock();
             }) as Box<dyn FnMut()>)
         };
 
@@ -803,6 +825,24 @@ impl Application {
         app.borrow().ui.mouse_input.add_event_listener_with_callback("input",
             mouse_sense_cb.as_ref().dyn_ref().unwrap())
             .expect("failed to add mouse_input input listener");
+
+        let gen_map_cb = |map: MapOption| {
+            let app = app.clone();
+            Closure::wrap(Box::new(move || {
+                app.borrow_mut().set_map(map);
+            }) as Box<dyn FnMut()>)
+        };
+
+        let map_runway_cb = gen_map_cb(MapOption::Runway);
+        let map_freestyle_cb = gen_map_cb(MapOption::Freestyle);
+
+        app.borrow().ui.map_runway.add_event_listener_with_callback("click",
+            map_runway_cb.as_ref().dyn_ref().unwrap())
+            .expect("failed to add map_runway click listener");
+
+        app.borrow().ui.map_freestyle.add_event_listener_with_callback("click",
+            map_freestyle_cb.as_ref().dyn_ref().unwrap())
+            .expect("failed to add map_freestyle click listener");
 
         let gen_move_preset_cb = |kinematics: Kinematics| {
             let app = app.clone();
@@ -882,6 +922,8 @@ impl Application {
         tutorial_cb.forget();
         practice_cb.forget();
         mouse_sense_cb.forget();
+        map_runway_cb.forget();
+        map_freestyle_cb.forget();
         move_vq3_like_cb.forget();
         move_qw_like_cb.forget();
         move_hybrid_cb.forget();
@@ -907,7 +949,7 @@ impl Application {
         let wish_dir = self.player_state.wish_dir(self.key_state, Rad::zero(), Rad::zero());
         self.player_state.sim_kinematics(&self.kinematics, dt, wish_dir, is_jumping, is_turning);
 
-        self.environment.interact(&mut self.player_state);
+        self.map.interact(&mut self.player_state);
 
         self.tick_remainder_s -= dt;
     }
@@ -999,7 +1041,7 @@ impl Application {
         let keys_pressed = self.update_keys();
 
         {
-            let c = self.environment.atmosphere_color().to_srgb();
+            let c = self.map.atmosphere_color().to_srgb();
             self.gl.gl().clear_color(c.r, c.g, c.b, 1.0);
         }
         self.gl.gl().clear(WebGlRenderingContext::COLOR_BUFFER_BIT | WebGlRenderingContext::DEPTH_BUFFER_BIT);
@@ -1031,7 +1073,10 @@ impl Application {
             self.gl.gl().enable(WebGlRenderingContext::DEPTH_TEST);
             self.gl.gl().depth_func(WebGlRenderingContext::LESS);
 
-            self.environment.draw(self.gl.gl(),
+            self.gl.gl().enable(WebGlRenderingContext::CULL_FACE);
+            self.gl.gl().cull_face(WebGlRenderingContext::BACK);
+
+            self.map.draw(self.gl.gl(),
                 &self.main_program,
                 &view_matrix,
                 &projection_matrix);

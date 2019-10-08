@@ -65,6 +65,30 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
                 align-items: center;
                 justify-content: center;
             }
+            #strafe_menu > * {
+                flex: none;
+            }
+            #strafe_practice_options {
+                display: flex;
+                flex-direction: row;
+                align-items: flex-start;
+                justify-content: center;
+
+                width: 100%;
+                height: auto;
+                min-height: 0;
+
+                display: flex;
+                flex-wrap: wrap;
+                flex-direction: column;
+                align-content: center;
+                align-items: center;
+                justify-content: flex-start;
+            }
+            #strafe_practice_options > * {
+                margin: 0.5em;
+                text-align: center;
+            }
             #strafe_menu table {
                 border-collapse: collapse;
                 color: lightblue;
@@ -129,9 +153,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
             #strafe_menu option {
                 color: black;
             }
-            #strafe_menu_movement {
-                text-align: center;
-            }
             #strafe_move_presets {
                 margin-bottom: 0.5em;
             }
@@ -152,6 +173,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
                 background-color: #000000f0;
                 color: lightblue;
                 font-size: 12pt;
+                font-family: 'Montserrat', sans-serif;
+                font-variant: normal;
+                font-weight: normal;
+                text-align: center;
             }
             #strafe_dialog {
                 position: absolute;
@@ -229,105 +254,113 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
                     <h2>Mouse Sensitivity</h2>
                     <input id="strafe_mouse_input" type="range" min="-13" max="-8" step="0.01">
                     <div style="text-align:right;">
-                        <label id="strafe_mouse_display" for="strafe_mouse_input"></label>
+                        <label id="strafe_mouse_display" for="strafe_mouse_input" data-tooltip="~10 &times; [Mouse DPI] is ideal"></label>
                     </div>
-                    <div style="margin-top:0.5em;text-align:center;font-size:70%;">(10 &times; [Mouse DPI] is a good starting point)</div>
                 </div>
-                <div id="strafe_menu_movement" class="strafe_hidden">
-                    <h2>Movement</h2>
-                    <div id="strafe_move_presets">
-                        <button id="strafe_move_vq3-like" type="button" data-tooltip="Moderate acceleration in a gradual arc; high top speed">Vanilla</button>
-                        <button id="strafe_move_qw-like" type="button" data-tooltip="Rapid acceleration and quick, sharp turns; low top speed">Old-Timey</button>
-                        <button id="strafe_move_hybrid" type="button" data-tooltip="Anisotropic hybrid mode; strafe with left- or right-only to make sharp turns">Hybrid</button>
+                <div id="strafe_practice_options" class="strafe_hidden" style="flex:initial;">
+                    <div>
+                        <h2>Maps</h2>
+                        <div id="strafe_move_presets">
+                            <button id="strafe_map_runway" type="button" data-tooltip="Endless road without obstacles">Runway</button>
+                            <button id="strafe_map_freestyle" type="button" data-tooltip="Randomly placed boxes, ideal for practicing air-control">Freestyle</button>
+                        </div>
                     </div>
-                    <table>
-                        <tbody>
-                            <tr>
-                                <td colspan="3"><label for="strafe_move_gravity">Gravity</label></td>
-                                <td><input id="strafe_move_gravity" type="number" min="250" max="5000"></td>
-                            </tr>
-                            <tr>
-                                <td colspan="3"><label for="strafe_move_jump_impulse">Jump Impulse</label></td>
-                                <td><input id="strafe_move_jump_impulse" type="number" min="50" max="1000"></td>
-                            </tr>
-                            <tr>
-                                <td colspan="3"><label for="strafe_move_stall_speed">Stall Speed</label></td>
-                                <td><input id="strafe_move_stall_speed" type="number" min="10" max="1000"></td>
-                            </tr>
-                            <tr>
-                                <td colspan="3"><label for="strafe_move_friction">Friction</label></td>
-                                <td><input id="strafe_move_friction" type="number" min="1" max="100"></td>
-                            </tr>
-                            <tr>
-                                <td colspan="2" rowspan="2">Ground</td>
-                                <td><label for="strafe_move_ground_speed">Max Speed</label></td>
-                                <td><input id="strafe_move_ground_speed" type="number" min="10" max="1000"></td>
-                            </tr>
-                            <tr>
-                                <td><label for="strafe_move_ground_accel">Acceleration</label></td>
-                                <td><input id="strafe_move_ground_accel" type="number" min="100" max="10000"></td>
-                            </tr>
-                            <tr>
-                                <td colspan="2" rowspan="2">Air</td>
-                                <td><label for="strafe_move_air_speed">Max Speed</label></td>
-                                <td><input id="strafe_move_air_speed" type="number" min="10" max="1000"></td>
-                            </tr>
-                            <tr>
-                                <td><label for="strafe_move_air_accel">Acceleration</label></td>
-                                <td><input id="strafe_move_air_accel" type="number" min="100" max="10000"></td>
-                            </tr>
-                            <tr>
-                                <td rowspan="2"><label for="strafe_move_turn_enabled">Air (turning)</label></td>
-                                <td rowspan="2"><input id="strafe_move_turn_enabled" type="checkbox"></td>
-                                <td><label for="strafe_move_turn_speed">Max Speed</label></td>
-                                <td><input id="strafe_move_turn_speed" type="number" min="10" max="1000"></td>
-                            </tr>
-                            <tr>
-                                <td><label for="strafe_move_turn_accel">Acceleration</label></td>
-                                <td><input id="strafe_move_turn_accel" type="number" min="100" max="10000"></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div id="strafe_menu_bot" class="strafe_hidden">
-                    <h2 data-tooltip="Only recommended for &quot;Vanilla&quot; movement">Strafe Bot</h2>
-                    <table>
-                        <tbody>
-                            <tr>
-                                <td>
-                                    <label for="strafe_bot_mode">Mode</label>
-                                </td>
-                                <td>
-                                    <select id="strafe_bot_mode">
-                                        <option value="unspecified" disabled hidden>Unspecified</option>
-                                        <option value="disabled">Disabled</option>
-                                        <option value="standard">Standard (W/A+W/D)</option>
-                                        <option value="reverse">Reverse (S/A+S/D)</option>
-                                        <option value="half-beat-left">Half-Beat, Left (W/A+D)</option>
-                                        <option value="half-beat-right">Half-Beat, Right (A+W/D)</option>
-                                    </select>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><label for="strafe_bot_hop">Auto-Hop</label></td>
-                                <td style="text-align: right;">
-                                    <input id="strafe_bot_hop" type="checkbox">
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><label for="strafe_bot_move">Auto-Move</label></td>
-                                <td style="text-align: right;">
-                                    <input id="strafe_bot_move" type="checkbox">
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><label for="strafe_bot_turn">Auto-Turn</label></td>
-                                <td style="text-align: right;">
-                                    <input id="strafe_bot_turn" type="checkbox">
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div>
+                        <h2>Movement</h2>
+                        <div id="strafe_move_presets">
+                            <button id="strafe_move_vq3-like" type="button" data-tooltip="Moderate acceleration in a gradual arc; high top speed">Vanilla</button>
+                            <button id="strafe_move_qw-like" type="button" data-tooltip="Rapid acceleration and quick, sharp turns; low top speed">Old-Timey</button>
+                            <button id="strafe_move_hybrid" type="button" data-tooltip="Anisotropic hybrid mode; strafe with left- or right-only to make sharp turns">Hybrid</button>
+                        </div>
+                        <table style="text-align:left;">
+                            <tbody>
+                                <tr>
+                                    <td colspan="3"><label for="strafe_move_gravity">Gravity</label></td>
+                                    <td><input id="strafe_move_gravity" type="number" min="250" max="5000"></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="3"><label for="strafe_move_jump_impulse">Jump Impulse</label></td>
+                                    <td><input id="strafe_move_jump_impulse" type="number" min="50" max="1000"></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="3"><label for="strafe_move_stall_speed">Stall Speed</label></td>
+                                    <td><input id="strafe_move_stall_speed" type="number" min="10" max="1000"></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="3"><label for="strafe_move_friction">Friction</label></td>
+                                    <td><input id="strafe_move_friction" type="number" min="1" max="100"></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="2" rowspan="2">Ground</td>
+                                    <td><label for="strafe_move_ground_speed">Max Speed</label></td>
+                                    <td><input id="strafe_move_ground_speed" type="number" min="10" max="1000"></td>
+                                </tr>
+                                <tr>
+                                    <td><label for="strafe_move_ground_accel">Acceleration</label></td>
+                                    <td><input id="strafe_move_ground_accel" type="number" min="100" max="10000"></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="2" rowspan="2">Air</td>
+                                    <td><label for="strafe_move_air_speed">Max Speed</label></td>
+                                    <td><input id="strafe_move_air_speed" type="number" min="10" max="1000"></td>
+                                </tr>
+                                <tr>
+                                    <td><label for="strafe_move_air_accel">Acceleration</label></td>
+                                    <td><input id="strafe_move_air_accel" type="number" min="100" max="10000"></td>
+                                </tr>
+                                <tr>
+                                    <td rowspan="2"><label for="strafe_move_turn_enabled">Air (turning)</label></td>
+                                    <td rowspan="2"><input id="strafe_move_turn_enabled" type="checkbox"></td>
+                                    <td><label for="strafe_move_turn_speed">Max Speed</label></td>
+                                    <td><input id="strafe_move_turn_speed" type="number" min="10" max="1000"></td>
+                                </tr>
+                                <tr>
+                                    <td><label for="strafe_move_turn_accel">Acceleration</label></td>
+                                    <td><input id="strafe_move_turn_accel" type="number" min="100" max="10000"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="strafe_menu_bot">
+                        <h2 data-tooltip="Only recommended for &quot;Vanilla&quot; movement">Strafe Bot</h2>
+                        <table style="text-align:left;">
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <label for="strafe_bot_mode">Mode</label>
+                                    </td>
+                                    <td>
+                                        <select id="strafe_bot_mode">
+                                            <option value="unspecified" disabled hidden>Unspecified</option>
+                                            <option value="disabled">Disabled</option>
+                                            <option value="standard">Standard (W/A+W/D)</option>
+                                            <option value="reverse">Reverse (S/A+S/D)</option>
+                                            <option value="half-beat-left">Half-Beat, Left (W/A+D)</option>
+                                            <option value="half-beat-right">Half-Beat, Right (A+W/D)</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><label for="strafe_bot_hop">Auto-Hop</label></td>
+                                    <td style="text-align: right;">
+                                        <input id="strafe_bot_hop" type="checkbox">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><label for="strafe_bot_move">Auto-Move</label></td>
+                                    <td style="text-align: right;">
+                                        <input id="strafe_bot_move" type="checkbox">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><label for="strafe_bot_turn">Auto-Turn</label></td>
+                                    <td style="text-align: right;">
+                                        <input id="strafe_bot_turn" type="checkbox">
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
