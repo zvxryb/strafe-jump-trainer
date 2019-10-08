@@ -35,7 +35,7 @@ use crate::player::{PlayerState, PLAYER_RADIUS};
 use cgmath::prelude::*;
 use rand::prelude::*;
 
-use cgmath::{Matrix4, Point3, Rad, Vector3};
+use cgmath::{Matrix4, Point3, Rad, Vector2, Vector3};
 use web_sys::WebGlRenderingContext;
 
 pub trait Map {
@@ -300,12 +300,25 @@ impl Freestyle {
 impl Map for Freestyle {
     fn atmosphere_color(&self) -> Color { Color::new(0.6, 0.8, 1.0, 0.0002) }
     fn interact(&mut self, player: &mut PlayerState) {
-        for box2d in self.scenery_collision.iter() {
-            if let Some(offset) = box2d.collide_circle(player.pos.xy(), PLAYER_RADIUS) {
-                if offset.magnitude2() > 0.000_001 {
-                    let dir = offset.normalize().extend(0.0);
-                    player.vel -= dir * dir.dot(player.vel).min(0.0);
-                    player.pos += offset.extend(0.0);
+        for cell_offset in &[
+            Vector2::new(-self.size, -self.size),
+            Vector2::new(       0.0, -self.size),
+            Vector2::new( self.size, -self.size),
+            Vector2::new(-self.size,        0.0),
+            Vector2::new(       0.0,        0.0),
+            Vector2::new( self.size,        0.0),
+            Vector2::new(-self.size,  self.size),
+            Vector2::new(       0.0,  self.size),
+            Vector2::new( self.size,  self.size),
+        ] {
+            let player_xy = player.pos.xy() + cell_offset;
+            for box2d in self.scenery_collision.iter() {
+                if let Some(offset) = box2d.collide_circle(player_xy, PLAYER_RADIUS) {
+                    if offset.magnitude2() > 0.000_001 {
+                        let dir = offset.normalize().extend(0.0);
+                        player.vel -= dir * dir.dot(player.vel).min(0.0);
+                        player.pos += offset.extend(0.0);
+                    }
                 }
             }
         }
