@@ -116,7 +116,7 @@ impl ops::BitOr for KeyState {
 #[derive(PartialEq)]
 pub enum Button {
     Key(String),
-    Mouse(u64),
+    Mouse(i16),
 }
 
 impl fmt::Display for Button {

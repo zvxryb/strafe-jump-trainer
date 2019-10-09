@@ -777,6 +777,20 @@ impl Application {
             }) as Box<dyn FnMut(_)>)
         };
 
+        let mouse_down_cb = {
+            let app = app.clone();
+            Closure::wrap(Box::new(move |event: MouseEvent| {
+                app.borrow_mut().input_button(Button::Mouse(event.button()), true);
+            }) as Box<dyn FnMut(_)>)
+        };
+
+        let mouse_up_cb = {
+            let app = app.clone();
+            Closure::wrap(Box::new(move |event: MouseEvent| {
+                app.borrow_mut().input_button(Button::Mouse(event.button()), false);
+            }) as Box<dyn FnMut(_)>)
+        };
+
         app.borrow().ui.window.add_event_listener_with_callback("resize",
             resize_cb.as_ref().dyn_ref().unwrap())
             .expect("failed to add resize event listener");
@@ -800,6 +814,14 @@ impl Application {
         app.borrow().ui.document.add_event_listener_with_callback("keyup",
             key_up_cb.as_ref().dyn_ref().unwrap())
             .expect("failed to add keyup event listener");
+
+        app.borrow().ui.document.add_event_listener_with_callback("mousedown",
+            mouse_down_cb.as_ref().dyn_ref().unwrap())
+            .expect("failed to add mousedown event listener");
+
+        app.borrow().ui.document.add_event_listener_with_callback("mouseup",
+            mouse_up_cb.as_ref().dyn_ref().unwrap())
+            .expect("failed to add mouseup event listener");
 
         let continue_cb = {
             let app = app.clone();
@@ -970,6 +992,8 @@ impl Application {
         mouse_move_cb.forget();
         key_down_cb.forget();
         key_up_cb.forget();
+        mouse_down_cb.forget();
+        mouse_up_cb.forget();
         continue_cb.forget();
         tutorial_cb.forget();
         practice_cb.forget();
