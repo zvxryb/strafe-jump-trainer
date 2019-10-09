@@ -84,9 +84,9 @@ impl Runway {
                         rng.gen_range(-LENGTH, LENGTH) / 2.0,
                         rng.gen_range( 64.0, 96.0));
                     let scale = BOX_WIDTH * scale * rng.gen_range(1.0, 2.0);
-                    let collides = positions.iter().find(|(other_offset, other_scale)| {
+                    let collides = positions.iter().any(|(other_offset, other_scale)| {
                         other_offset.xy().distance(offset.xy()) <= 1.414 * (scale + other_scale) / 2.0
-                    }).is_some();
+                    });
                     if !collides {
                         positions.push((offset, scale));
                     }
@@ -245,9 +245,9 @@ impl Freestyle {
                 0.0);
             let scale = BOX_WIDTH * rng.gen_range(1.5, 3.0);
             let collides = offset.xy().magnitude() < (1.414 * scale + PLAYER_RADIUS) ||
-                positions.iter().find(|(other_offset, other_scale)| {
+                positions.iter().any(|(other_offset, other_scale)| {
                     other_offset.xy().distance(offset.xy()) <= (scale + other_scale) / 2.0
-                }).is_some();
+                });
             if !collides {
                 positions.push((offset, scale));
             }

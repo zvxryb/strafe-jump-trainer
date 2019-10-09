@@ -15,6 +15,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::input::KeyCode;
+
 use wasm_bindgen::JsCast;
 use web_sys::{
     Document,
@@ -51,6 +53,12 @@ pub struct UI {
     pub menu_practice: HtmlButtonElement,
     pub mouse_input: HtmlInputElement,
     pub mouse_display: Element,
+    pub bind_forward : HtmlButtonElement,
+    pub bind_left    : HtmlButtonElement,
+    pub bind_back    : HtmlButtonElement,
+    pub bind_right   : HtmlButtonElement,
+    pub bind_jump    : HtmlButtonElement,
+    pub bind_interact: HtmlButtonElement,
     pub practice_options: HtmlElement,
     pub map_runway: HtmlButtonElement,
     pub map_freestyle: HtmlButtonElement,
@@ -75,6 +83,19 @@ pub struct UI {
     pub bot_turn: HtmlInputElement,
 }
 
+impl UI {
+    pub fn keybind_button(&self, key: KeyCode) -> &HtmlButtonElement {
+        match key {
+            KeyCode::KeyW  => &self.bind_forward,
+            KeyCode::KeyA  => &self.bind_left,
+            KeyCode::KeyS  => &self.bind_back,
+            KeyCode::KeyD  => &self.bind_right,
+            KeyCode::KeyF  => &self.bind_interact,
+            KeyCode::Space => &self.bind_jump,
+        }
+    }
+}
+
 pub fn get_ui() -> UI {
     let window = web_sys::window()
         .expect("failed to get window");
@@ -89,91 +110,55 @@ pub fn get_ui() -> UI {
             .unwrap_or_else(|_| panic!("failed to cast {}", id))
     }
 
-    let root_node         = get_as::<HtmlDivElement   >(&document, "strafe_root");
-    let canvas            = get_as::<HtmlCanvasElement>(&document, "strafe_canvas");
-    let dialog            = get_as::<HtmlElement      >(&document, "strafe_dialog");
-    let keys              = get_as::<Element          >(&document, "strafe_keys");
-    let key_forward       = get_as::<Element          >(&document, "strafe_key_forward");
-    let key_back          = get_as::<Element          >(&document, "strafe_key_back");
-    let key_left          = get_as::<Element          >(&document, "strafe_key_left");
-    let key_right         = get_as::<Element          >(&document, "strafe_key_right");
-    let key_jump          = get_as::<Element          >(&document, "strafe_key_jump");
-    let framerate         = get_as::<HtmlElement      >(&document, "strafe_framerate");
-    let speed_ups         = get_as::<HtmlElement      >(&document, "strafe_speed_ups");
-    let speed_mph         = get_as::<HtmlElement      >(&document, "strafe_speed_mph");
-    let speed_kph         = get_as::<HtmlElement      >(&document, "strafe_speed_kph");
-    let menu              = get_as::<HtmlDivElement   >(&document, "strafe_menu");
-    let menu_continue     = get_as::<HtmlButtonElement>(&document, "strafe_menu_continue");
-    let menu_tutorial     = get_as::<HtmlButtonElement>(&document, "strafe_menu_tutorial");
-    let menu_practice     = get_as::<HtmlButtonElement>(&document, "strafe_menu_practice");
-    let mouse_input       = get_as::<HtmlInputElement >(&document, "strafe_mouse_input");
-    let mouse_display     = get_as::<Element          >(&document, "strafe_mouse_display");
-    let practice_options  = get_as::<HtmlElement      >(&document, "strafe_practice_options");
-    let map_runway        = get_as::<HtmlButtonElement>(&document, "strafe_map_runway");
-    let map_freestyle     = get_as::<HtmlButtonElement>(&document, "strafe_map_freestyle");
-    let move_vq3_like     = get_as::<HtmlButtonElement>(&document, "strafe_move_vq3-like");
-    let move_qw_like      = get_as::<HtmlButtonElement>(&document, "strafe_move_qw-like");
-    let move_hybrid       = get_as::<HtmlButtonElement>(&document, "strafe_move_hybrid");
-    let move_gravity      = get_as::<HtmlInputElement >(&document, "strafe_move_gravity");
-    let move_jump_impulse = get_as::<HtmlInputElement >(&document, "strafe_move_jump_impulse");
-    let move_stall_speed  = get_as::<HtmlInputElement >(&document, "strafe_move_stall_speed");
-    let move_friction     = get_as::<HtmlInputElement >(&document, "strafe_move_friction");
-    let move_ground_speed = get_as::<HtmlInputElement >(&document, "strafe_move_ground_speed");
-    let move_ground_accel = get_as::<HtmlInputElement >(&document, "strafe_move_ground_accel");
-    let move_air_speed    = get_as::<HtmlInputElement >(&document, "strafe_move_air_speed");
-    let move_air_accel    = get_as::<HtmlInputElement >(&document, "strafe_move_air_accel");
-    let move_turn_enabled = get_as::<HtmlInputElement >(&document, "strafe_move_turn_enabled");
-    let move_turn_speed   = get_as::<HtmlInputElement >(&document, "strafe_move_turn_speed");
-    let move_turn_accel   = get_as::<HtmlInputElement >(&document, "strafe_move_turn_accel");
-    let menu_bot          = get_as::<HtmlElement      >(&document, "strafe_menu_bot");
-    let bot_mode          = get_as::<HtmlSelectElement>(&document, "strafe_bot_mode");
-    let bot_hop           = get_as::<HtmlInputElement >(&document, "strafe_bot_hop");
-    let bot_move          = get_as::<HtmlInputElement >(&document, "strafe_bot_move");
-    let bot_turn          = get_as::<HtmlInputElement >(&document, "strafe_bot_turn");
-
-    UI{
+    UI {
         window,
-        document,
-        root_node,
-        canvas,
-        dialog,
-        keys,
-        key_forward,
-        key_back,
-        key_left,
-        key_right,
-        key_jump,
-        framerate,
-        speed_ups,
-        speed_mph,
-        speed_kph,
-        menu,
-        menu_continue,
-        menu_tutorial,
-        menu_practice,
-        mouse_input,
-        mouse_display,
-        practice_options,
-        map_runway,
-        map_freestyle,
-        move_vq3_like,
-        move_qw_like,
-        move_hybrid,
-        move_gravity,
-        move_jump_impulse,
-        move_stall_speed,
-        move_friction,
-        move_ground_speed,
-        move_ground_accel,
-        move_air_speed,
-        move_air_accel,
-        move_turn_enabled,
-        move_turn_speed,
-        move_turn_accel,
-        menu_bot,
-        bot_mode,
-        bot_hop,
-        bot_move,
-        bot_turn,
+        document: document.clone(),
+        root_node        : get_as::<HtmlDivElement   >(&document, "strafe_root"),
+        canvas           : get_as::<HtmlCanvasElement>(&document, "strafe_canvas"),
+        dialog           : get_as::<HtmlElement      >(&document, "strafe_dialog"),
+        keys             : get_as::<Element          >(&document, "strafe_keys"),
+        key_forward      : get_as::<Element          >(&document, "strafe_key_forward"),
+        key_back         : get_as::<Element          >(&document, "strafe_key_back"),
+        key_left         : get_as::<Element          >(&document, "strafe_key_left"),
+        key_right        : get_as::<Element          >(&document, "strafe_key_right"),
+        key_jump         : get_as::<Element          >(&document, "strafe_key_jump"),
+        framerate        : get_as::<HtmlElement      >(&document, "strafe_framerate"),
+        speed_ups        : get_as::<HtmlElement      >(&document, "strafe_speed_ups"),
+        speed_mph        : get_as::<HtmlElement      >(&document, "strafe_speed_mph"),
+        speed_kph        : get_as::<HtmlElement      >(&document, "strafe_speed_kph"),
+        menu             : get_as::<HtmlDivElement   >(&document, "strafe_menu"),
+        menu_continue    : get_as::<HtmlButtonElement>(&document, "strafe_menu_continue"),
+        menu_tutorial    : get_as::<HtmlButtonElement>(&document, "strafe_menu_tutorial"),
+        menu_practice    : get_as::<HtmlButtonElement>(&document, "strafe_menu_practice"),
+        mouse_input      : get_as::<HtmlInputElement >(&document, "strafe_mouse_input"),
+        mouse_display    : get_as::<Element          >(&document, "strafe_mouse_display"),
+        bind_forward     : get_as::<HtmlButtonElement>(&document, "strafe_bind_forward"),
+        bind_left        : get_as::<HtmlButtonElement>(&document, "strafe_bind_left"),
+        bind_back        : get_as::<HtmlButtonElement>(&document, "strafe_bind_back"),
+        bind_right       : get_as::<HtmlButtonElement>(&document, "strafe_bind_right"),
+        bind_jump        : get_as::<HtmlButtonElement>(&document, "strafe_bind_jump"),
+        bind_interact    : get_as::<HtmlButtonElement>(&document, "strafe_bind_interact"),
+        practice_options : get_as::<HtmlElement      >(&document, "strafe_practice_options"),
+        map_runway       : get_as::<HtmlButtonElement>(&document, "strafe_map_runway"),
+        map_freestyle    : get_as::<HtmlButtonElement>(&document, "strafe_map_freestyle"),
+        move_vq3_like    : get_as::<HtmlButtonElement>(&document, "strafe_move_vq3-like"),
+        move_qw_like     : get_as::<HtmlButtonElement>(&document, "strafe_move_qw-like"),
+        move_hybrid      : get_as::<HtmlButtonElement>(&document, "strafe_move_hybrid"),
+        move_gravity     : get_as::<HtmlInputElement >(&document, "strafe_move_gravity"),
+        move_jump_impulse: get_as::<HtmlInputElement >(&document, "strafe_move_jump_impulse"),
+        move_stall_speed : get_as::<HtmlInputElement >(&document, "strafe_move_stall_speed"),
+        move_friction    : get_as::<HtmlInputElement >(&document, "strafe_move_friction"),
+        move_ground_speed: get_as::<HtmlInputElement >(&document, "strafe_move_ground_speed"),
+        move_ground_accel: get_as::<HtmlInputElement >(&document, "strafe_move_ground_accel"),
+        move_air_speed   : get_as::<HtmlInputElement >(&document, "strafe_move_air_speed"),
+        move_air_accel   : get_as::<HtmlInputElement >(&document, "strafe_move_air_accel"),
+        move_turn_enabled: get_as::<HtmlInputElement >(&document, "strafe_move_turn_enabled"),
+        move_turn_speed  : get_as::<HtmlInputElement >(&document, "strafe_move_turn_speed"),
+        move_turn_accel  : get_as::<HtmlInputElement >(&document, "strafe_move_turn_accel"),
+        menu_bot         : get_as::<HtmlElement      >(&document, "strafe_menu_bot"),
+        bot_mode         : get_as::<HtmlSelectElement>(&document, "strafe_bot_mode"),
+        bot_hop          : get_as::<HtmlInputElement >(&document, "strafe_bot_hop"),
+        bot_move         : get_as::<HtmlInputElement >(&document, "strafe_bot_move"),
+        bot_turn         : get_as::<HtmlInputElement >(&document, "strafe_bot_turn"),
     }
 }

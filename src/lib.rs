@@ -72,7 +72,7 @@ use gfx::{
     ConstantValue,
     WarpEffect,
 };
-use input::KeyState;
+use input::{Button, KeyBinds, KeyCode, KeyState};
 use player::{
     Kinematics,
     Movement,
@@ -288,6 +288,8 @@ struct Application {
     have_pointer: bool,
     input_rotation: (Rad<f32>, Rad<f32>),
     mouse_scale: Rad<f32>,
+    key_binds:       KeyBinds,
+    key_selected:    Option<KeyCode>,
     key_state:       KeyState,
     key_history:     KeyState,
     input_key_state: KeyState,
@@ -357,6 +359,8 @@ impl Application {
             have_pointer: false,
             input_rotation: (Rad::zero(), Rad::zero()),
             mouse_scale: Rad(0.000_785),
+            key_binds:       KeyBinds::default(),
+            key_selected:    None,
             key_state:       KeyState::default(),
             key_history:     KeyState::default(),
             input_key_state: KeyState::default(),
@@ -374,6 +378,7 @@ impl Application {
         };
 
         app.update_mouse_sensitivity();
+        app.update_key_binds();
         app.update_movement_display();
         app.update_bot_display();
 
@@ -494,6 +499,47 @@ impl Application {
                 hide(&self.ui.keys);
             },
         };
+    }
+
+    fn update_key_bind_text(&self, target: KeyCode) {
+        let is_selected = match self.key_selected {
+            Some(selected) => target == selected,
+            None => false,
+        };
+        let text = if is_selected {
+             "Press any button".to_string()
+        } else {
+             format!("{}", self.key_binds.button(target))
+        };
+        self.ui.keybind_button(target)
+            .dyn_ref::<web_sys::Node>().unwrap()
+            .set_text_content(
+                Some(text.as_str()));
+    }
+
+    fn update_key_binds(&self) {
+        [
+            KeyCode::KeyW,
+            KeyCode::KeyA,
+            KeyCode::KeyS,
+            KeyCode::KeyD,
+            KeyCode::KeyF,
+            KeyCode::Space,
+        ].iter().for_each(|&target| {
+            self.update_key_bind_text(target)
+        });
+    }
+
+    fn input_button(&mut self, button: Button, pressed: bool) {
+        if let Some(target) = self.key_selected {
+            if !pressed {
+                self.key_binds.rebind(target, button);
+                self.key_selected = None;
+                self.update_key_binds();
+            }
+        } else {
+            self.input_key_state.set_mapped(&self.key_binds, button, pressed);
+        }
     }
 
     fn show_menu(&mut self) {
@@ -720,32 +766,14 @@ impl Application {
         let key_down_cb = {
             let app = app.clone();
             Closure::wrap(Box::new(move |event: KeyboardEvent| {
-                let key_state = &mut app.borrow_mut().input_key_state;
-                match event.code().as_str() {
-                    "KeyW" => key_state.key_w = true,
-                    "KeyA" => key_state.key_a = true,
-                    "KeyS" => key_state.key_s = true,
-                    "KeyD" => key_state.key_d = true,
-                    "KeyF" => key_state.key_f = true,
-                    "Space" => key_state.space = true,
-                    _ => {},
-                }
+                app.borrow_mut().input_button(Button::Key(event.code()), true);
             }) as Box<dyn FnMut(_)>)
         };
 
         let key_up_cb = {
             let app = app.clone();
             Closure::wrap(Box::new(move |event: KeyboardEvent| {
-                let key_state = &mut app.borrow_mut().input_key_state;
-                match event.code().as_str() {
-                    "KeyW" => key_state.key_w = false,
-                    "KeyA" => key_state.key_a = false,
-                    "KeyS" => key_state.key_s = false,
-                    "KeyD" => key_state.key_d = false,
-                    "KeyF" => key_state.key_f = false,
-                    "Space" => key_state.space = false,
-                    _ => {},
-                }
+                app.borrow_mut().input_button(Button::Key(event.code()), false);
             }) as Box<dyn FnMut(_)>)
         };
 
@@ -825,6 +853,30 @@ impl Application {
         app.borrow().ui.mouse_input.add_event_listener_with_callback("input",
             mouse_sense_cb.as_ref().dyn_ref().unwrap())
             .expect("failed to add mouse_input input listener");
+
+        [
+            KeyCode::KeyW,
+            KeyCode::KeyA,
+            KeyCode::KeyS,
+            KeyCode::KeyD,
+            KeyCode::KeyF,
+            KeyCode::Space,
+        ].iter().for_each(|&target| {
+            let callback = {
+                let app = app.clone();
+                Closure::wrap(Box::new(move || {
+                    app.borrow().ui.keybind_button(target)
+                        .dyn_ref::<web_sys::Node>().unwrap()
+                        .set_text_content(Some("Press any button"));
+                    app.borrow_mut().key_selected = Some(target);
+                }) as Box<dyn FnMut()>)
+            };
+            app.borrow().ui.keybind_button(target)
+                .add_event_listener_with_callback("click",
+                    callback.as_ref().dyn_ref().unwrap())
+                .expect("failed to add keybind click listener");
+            callback.forget();
+        });
 
         let gen_map_cb = |map: MapOption| {
             let app = app.clone();
