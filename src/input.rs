@@ -15,6 +15,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use serde::{Serialize, Deserialize};
+use web_sys::Storage;
+
 use std::fmt;
 use std::ops;
 
@@ -113,7 +116,7 @@ impl ops::BitOr for KeyState {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Serialize, Deserialize)]
 pub enum Button {
     Key(String),
     Mouse(i16),
@@ -128,6 +131,7 @@ impl fmt::Display for Button {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct KeyBinds {
     pub key_w: Button,
     pub key_a: Button,
@@ -138,6 +142,18 @@ pub struct KeyBinds {
 }
 
 impl KeyBinds {
+    pub fn load(storage: &Storage, key: &str) -> Result<Self, ()> {
+        let data = storage.get_item(key)
+            .map_err(|_| ())?
+            .ok_or(())?;
+        serde_json::from_str(data.as_str()).map_err(|_| ())
+    }
+
+    pub fn save(&self, storage: &Storage, key: &str) -> Result<(), ()> {
+        let data = serde_json::to_string(&self).map_err(|_| ())?;
+        storage.set_item(key, data.as_str()).map_err(|_| ())
+    }
+
     pub fn button(&self, target: KeyCode) -> &Button {
         match target {
             KeyCode::KeyW  => &self.key_w,

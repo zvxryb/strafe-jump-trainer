@@ -38,6 +38,7 @@ use web_sys::{
     Element,
     KeyboardEvent,
     MouseEvent,
+    Storage,
     WebGlRenderingContext,
 };
 
@@ -276,6 +277,7 @@ void main() {
 struct Application {
     ui: UI,
     gl: AnyGlContext,
+    storage: Option<Storage>,
     stage: Option<TutorialStage>,
     perspective: PerspectiveFov::<f32>,
     player_state: PlayerState,
@@ -308,6 +310,15 @@ struct Application {
 
 impl Application {
     fn from_ui(ui: UI) -> Self {
+        let storage = ui.window.local_storage()
+            .ok()
+            .and_then(|storage| storage);
+
+        let key_binds = storage.as_ref()
+            .map(|storage| { KeyBinds::load(storage, "key_binds").ok() })
+            .and_then(|key_binds| key_binds)
+            .unwrap_or_default();
+
         let gl = AnyGlContext::from_canvas(&ui.canvas,
             GlVersionRequirement::Any)
             .expect("failed to get WebGL context");
@@ -341,7 +352,7 @@ impl Application {
             .expect("failed to build box VBO");
 
         let mut app = Application{
-            ui, gl,
+            ui, gl, storage,
             stage: None,
             perspective: PerspectiveFov::<f32>{
                 fovy: Deg(80.0).into(),
@@ -359,7 +370,7 @@ impl Application {
             have_pointer: false,
             input_rotation: (Rad::zero(), Rad::zero()),
             mouse_scale: Rad(0.000_785),
-            key_binds:       KeyBinds::default(),
+            key_binds,
             key_selected:    None,
             key_state:       KeyState::default(),
             key_history:     KeyState::default(),
@@ -536,6 +547,13 @@ impl Application {
                 self.key_binds.rebind(target, button);
                 self.key_selected = None;
                 self.update_key_binds();
+                if let Some(storage) = &self.storage {
+                    if self.key_binds.save(storage, "key_binds").is_err() {
+                        error("failed to save key binds");
+                    }
+                } else {
+                    warn("cannot save key binds; no local_storage");
+                }
             }
         } else {
             self.input_key_state.set_mapped(&self.key_binds, button, pressed);
