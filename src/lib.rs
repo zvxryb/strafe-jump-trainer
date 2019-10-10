@@ -455,7 +455,7 @@ impl Application {
                             We'll begin with hopping practice.  Strafe bot will continue to handle basic \
                             motion, but you will have to press SPACE as indicated on the HUD.\n\n\
                             The first motion is referred to as a \"circle-jump\", which is a quick turn \
-                            while grounded to gain maximum ground acceleration before jumping.  This works \
+                            while grounded to gain maximum ground acceleration before jumping.  This is helpful \
                             because ground acceleration is generally higher than air acceleration, but is \
                             limited to just over 400UPS by friction.  Once maximum ground speed is reached \
                             this speed is maintained by repeatedly hopping.\n\n\
@@ -470,12 +470,13 @@ impl Application {
                     TutorialStage::Moving(..) => {
                         dialog.set_text_content(Some("\
                             Next, let's practice movement keys.  This time you'll have control over \
-                            W/A/S/D, exclusively.  Simply follow along with the HUD indicators.\n\n\
+                            \u{2191}/\u{2193}/\u{2190}/\u{2192}, exclusively.  Simply follow along with the HUD \
+                            indicators.\n\n\
                             While a player can strafe using any movement key or pair of movement keys \
                             at any time, the choice of key(s) determines which direction a player faces \
                             for a chosen direction of motion.  It is possible to strafe backwards, sideways, \
-                            etc.  W/A and W/D are the most common strafe keys enabling a player to travel in \
-                            a mostly-forward direction.\n\n\
+                            etc.  \u{2191}/\u{2190} and \u{2191}/\u{2192} are the most common strafe keys enabling \
+                            a player to travel in a mostly-forward direction.\n\n\
                             Reach 1000 UPS to continue."));
                         self.strafe_bot = Some(StrafeBot::new(StrafeConfig::STANDARD));
                         self.auto_hop  = true;
@@ -958,9 +959,17 @@ impl Application {
             let callback = {
                 let app = app.clone();
                 Closure::wrap(Box::new(move || {
-                    app.borrow().ui.keybind_button(target)
-                        .dyn_ref::<web_sys::Node>().unwrap()
-                        .set_text_content(Some("Press any button"));
+                    {
+                        let app = app.borrow();
+                        let button = app.ui.keybind_button(target);
+                        button
+                            .dyn_ref::<web_sys::Node>().unwrap()
+                            .set_text_content(Some("Press any button"));
+                        button
+                            .dyn_ref::<web_sys::HtmlElement>().unwrap()
+                            .blur()
+                            .ok();
+                    }
                     app.borrow_mut().key_selected = Some(target);
                 }) as Box<dyn FnMut()>)
             };
@@ -1145,11 +1154,11 @@ impl Application {
                 let dialog = &mut self.ui.dialog.dyn_ref::<web_sys::Node>().unwrap();
                 let mut text = dialog.text_content().unwrap_or_default();
                 let prompt = if let TutorialStage::Turning(..) = stage {
-                    "\n\nPress \"F\" to conclude tutorial."
+                    format!("\n\nPress ({}) to conclude tutorial.", self.key_binds.key_f)
                 } else {
-                    "\n\nPress \"F\" to proceed."
+                    format!("\n\nPress ({}) to proceed.", self.key_binds.key_f)
                 };
-                text.push_str(prompt);
+                text.push_str(prompt.as_str());
                 dialog.set_text_content(Some(text.as_str()));
             }
 
