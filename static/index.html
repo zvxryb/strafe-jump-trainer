@@ -257,11 +257,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
                 <button id="strafe_menu_practice">Practice</button>
                 <div id="strafe_options">
                     <div>
-                        <h2>Mouse Sensitivity</h2>
+                        <h2>Mouse Settings</h2>
                         <input id="strafe_mouse_input" type="range" min="-13" max="-8" step="0.01">
                         <div style="text-align:right;">
                             <label id="strafe_mouse_display" for="strafe_mouse_input" data-tooltip="~10 &times; [Mouse DPI] is ideal"></label>
                         </div>
+                        <div style="margin-top:0.5em;">
+                            <label for="strafe_mouse_flip_x">Flip X</label><input id="strafe_mouse_flip_x" type="checkbox">
+                            <label for="strafe_mouse_flip_y">Flip Y</label><input id="strafe_mouse_flip_y" type="checkbox">
+                        <div>
                         <h2>Key Binds</h2>
                         <table id="strafe_binds">
                             <tbody>

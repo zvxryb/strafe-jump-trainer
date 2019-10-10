@@ -8,7 +8,7 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
-cgmath = {version="0.17", features=["swizzle"]}
+cgmath = {version="0.17", features=["serde", "swizzle"]}
 console_error_panic_hook = "0.1"
 js-sys = "0.3"
 rand = {version="0.7", features=["wasm-bindgen"]}

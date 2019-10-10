@@ -73,7 +73,13 @@ use gfx::{
     ConstantValue,
     WarpEffect,
 };
-use input::{Button, KeyBinds, KeyCode, KeyState};
+use input::{
+    Button,
+    KeyBinds,
+    KeyCode,
+    KeyState,
+    MouseSettings,
+};
 use player::{
     Kinematics,
     Movement,
@@ -289,7 +295,7 @@ struct Application {
     menu_shown: bool,
     have_pointer: bool,
     input_rotation: (Rad<f32>, Rad<f32>),
-    mouse_scale: Rad<f32>,
+    mouse_settings:  MouseSettings,
     key_binds:       KeyBinds,
     key_selected:    Option<KeyCode>,
     key_state:       KeyState,
@@ -318,6 +324,14 @@ impl Application {
             .map(|storage| { KeyBinds::load(storage, "key_binds").ok() })
             .and_then(|key_binds| key_binds)
             .unwrap_or_default();
+
+        let mouse_settings = storage.as_ref()
+            .map(|storage| { MouseSettings::load(storage, "mouse_settings").ok() })
+            .and_then(|mouse_settings| mouse_settings)
+            .unwrap_or_default();
+
+        ui.mouse_flip_x.set_checked(mouse_settings.flip_x);
+        ui.mouse_flip_y.set_checked(mouse_settings.flip_y);
 
         let gl = AnyGlContext::from_canvas(&ui.canvas,
             GlVersionRequirement::Any)
@@ -369,7 +383,7 @@ impl Application {
             menu_shown: true,
             have_pointer: false,
             input_rotation: (Rad::zero(), Rad::zero()),
-            mouse_scale: Rad(0.000_785),
+            mouse_settings,
             key_binds,
             key_selected:    None,
             key_state:       KeyState::default(),
@@ -570,8 +584,18 @@ impl Application {
         self.menu_shown = false;
     }
 
+    fn save_mouse_settings(&self) {
+        if let Some(storage) = &self.storage {
+            if self.mouse_settings.save(storage, "mouse_settings").is_err() {
+                error("failed to save mouse settings");
+            }
+        } else {
+            warn("cannot save mouse settings; no local_storage");
+        }
+    }
+
     fn update_mouse_sensitivity(&mut self) {
-        let sense = self.mouse_scale;
+        let sense = self.mouse_settings.scale;
         self.ui.mouse_input.set_value_as_number(f64::from(sense.0.log2()));
         self.ui.mouse_display.dyn_ref::<web_sys::Node>().unwrap().set_text_content(
             Some(format!("{:.0} counts/rotation", Rad::<f32>::full_turn() / sense).as_str()));
@@ -774,9 +798,11 @@ impl Application {
                 let menu_shown = app.borrow().menu_shown;
                 let override_turning = app.borrow().override_turning();
                 if have_pointer && !menu_shown && !override_turning {
-                    let scale = app.borrow().mouse_scale;
-                    app.borrow_mut().input_rotation.0 -= scale * (event.movement_x() as f32);
-                    app.borrow_mut().input_rotation.1 -= scale * (event.movement_y() as f32);
+                    let settings = app.borrow().mouse_settings;
+                    let flip_x = if settings.flip_x { -1.0 } else { 1.0 };
+                    let flip_y = if settings.flip_y { -1.0 } else { 1.0 };
+                    app.borrow_mut().input_rotation.0 -= settings.scale * (event.movement_x() as f32) * flip_x;
+                    app.borrow_mut().input_rotation.1 -= settings.scale * (event.movement_y() as f32) * flip_y;
                 }
             }) as Box<dyn FnMut(_)>)
         };
@@ -885,14 +911,41 @@ impl Application {
             let app = app.clone();
             Closure::wrap(Box::new(move || {
                 let log2_sense = app.borrow().ui.mouse_input.value_as_number() as f32;
-                app.borrow_mut().mouse_scale = Rad::<f32>(log2_sense.exp2());
+                app.borrow_mut().mouse_settings.scale = Rad::<f32>(log2_sense.exp2());
                 app.borrow_mut().update_mouse_sensitivity();
+                app.borrow().save_mouse_settings();
             }) as Box<dyn FnMut()>)
         };
 
         app.borrow().ui.mouse_input.add_event_listener_with_callback("input",
             mouse_sense_cb.as_ref().dyn_ref().unwrap())
             .expect("failed to add mouse_input input listener");
+
+        let mouse_flip_x_cb = {
+            let app = app.clone();
+            Closure::wrap(Box::new(move || {
+                let flip = app.borrow().ui.mouse_flip_x.checked();
+                app.borrow_mut().mouse_settings.flip_x = flip;
+                app.borrow().save_mouse_settings();
+            }) as Box<dyn FnMut()>)
+        };
+
+        app.borrow().ui.mouse_flip_x.add_event_listener_with_callback("change",
+            mouse_flip_x_cb.as_ref().dyn_ref().unwrap())
+            .expect("failed to add mouse_flip_x change listener");
+
+        let mouse_flip_y_cb = {
+            let app = app.clone();
+            Closure::wrap(Box::new(move || {
+                let flip = app.borrow().ui.mouse_flip_y.checked();
+                app.borrow_mut().mouse_settings.flip_y = flip;
+                app.borrow().save_mouse_settings();
+            }) as Box<dyn FnMut()>)
+        };
+
+        app.borrow().ui.mouse_flip_y.add_event_listener_with_callback("change",
+            mouse_flip_y_cb.as_ref().dyn_ref().unwrap())
+            .expect("failed to add mouse_flip_y change listener");
 
         [
             KeyCode::KeyW,
@@ -1016,6 +1069,8 @@ impl Application {
         tutorial_cb.forget();
         practice_cb.forget();
         mouse_sense_cb.forget();
+        mouse_flip_x_cb.forget();
+        mouse_flip_y_cb.forget();
         map_runway_cb.forget();
         map_freestyle_cb.forget();
         move_vq3_like_cb.forget();
