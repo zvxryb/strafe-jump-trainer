@@ -15,11 +15,12 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 -->
-<html>
+<html lang="en">
     <head>
         <meta content="text/html;charset=utf-8" http-equiv="Content-Type"/>
-        <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.10.2/css/fontawesome.min.css' integrity='sha256-0mlw4Ae1j9eDzZTzLuw5X9fBCL9nAehrtVyKfIstZQA=' crossorigin='anonymous'></link>
-        <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.10.2/css/solid.min.css' integrity='sha256-xlh4aT8Ni/MnbIvFWbnIrJ+YKe+1S/y1xNQl7YWArXc=' crossorigin='anonymous'></link>
+        <title>Strafe Jump Trainer</title>
+        <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.10.2/css/fontawesome.min.css' integrity='sha256-0mlw4Ae1j9eDzZTzLuw5X9fBCL9nAehrtVyKfIstZQA=' crossorigin='anonymous'>
+        <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.10.2/css/solid.min.css' integrity='sha256-xlh4aT8Ni/MnbIvFWbnIrJ+YKe+1S/y1xNQl7YWArXc=' crossorigin='anonymous'>
         <style>
             @import url('https://fonts.googleapis.com/css?family=Inconsolata|Montserrat&display=swap');
             .strafe_hidden {
@@ -49,6 +50,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
                 bottom: 0;
                 right: 0;
                 pointer-events: none;
+                overflow: hidden;
             }
             #strafe_menu {
                 position: absolute;
@@ -64,6 +66,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
                 flex-direction: column;
                 align-items: center;
                 justify-content: center;
+                overflow: hidden;
             }
             #strafe_menu > * {
                 flex: none;
@@ -265,7 +268,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
                         <div style="margin-top:0.5em;">
                             <label for="strafe_mouse_flip_x">Flip X</label><input id="strafe_mouse_flip_x" type="checkbox">
                             <label for="strafe_mouse_flip_y">Flip Y</label><input id="strafe_mouse_flip_y" type="checkbox">
-                        <div>
+                        </div>
                         <h2>Key Binds</h2>
                         <table id="strafe_binds">
                             <tbody>
@@ -281,7 +284,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
                     <div id="strafe_practice_options" class="strafe_hidden">
                         <div>
                             <h2>Maps</h2>
-                            <div id="strafe_move_presets">
+                            <div>
                                 <button id="strafe_map_runway" data-tooltip="Endless road without obstacles">Runway</button>
                                 <button id="strafe_map_freestyle" data-tooltip="Randomly placed boxes, ideal for practicing air-control">Freestyle</button>
                             </div>
