@@ -692,6 +692,9 @@ impl Application {
             Some(StrafeBot{config: StrafeConfig::REVERSE        , ..}) => "reverse",
             Some(StrafeBot{config: StrafeConfig::HALF_BEAT_LEFT , ..}) => "half-beat-left",
             Some(StrafeBot{config: StrafeConfig::HALF_BEAT_RIGHT, ..}) => "half-beat-right",
+            Some(StrafeBot{config: StrafeConfig::HIGH_SPEED     , ..}) => "high-speed",
+            Some(StrafeBot{config: StrafeConfig::SIDEWAYS_LEFT  , ..}) => "sideways-left",
+            Some(StrafeBot{config: StrafeConfig::SIDEWAYS_RIGHT , ..}) => "sideways-right",
             Some(_) => "unspecified",
             None => "disabled",
         });
@@ -723,6 +726,9 @@ impl Application {
             "reverse"        => update_config(&mut self.strafe_bot, StrafeConfig::REVERSE),
             "half-beat-left" => update_config(&mut self.strafe_bot, StrafeConfig::HALF_BEAT_LEFT),
             "half-beat-right"=> update_config(&mut self.strafe_bot, StrafeConfig::HALF_BEAT_RIGHT),
+            "high-speed"     => update_config(&mut self.strafe_bot, StrafeConfig::HIGH_SPEED),
+            "sideways-left"  => update_config(&mut self.strafe_bot, StrafeConfig::SIDEWAYS_LEFT),
+            "sideways-right" => update_config(&mut self.strafe_bot, StrafeConfig::SIDEWAYS_RIGHT),
             "disabled"       => { self.strafe_bot = None },
             _ => {},
         }

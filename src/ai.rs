@@ -99,6 +99,21 @@ impl StrafeConfig {
         keys_cw : Some(Self::KEYS_WD),
         keys_ccw: Some(Self::KEYS_A),
     };
+
+    pub const HIGH_SPEED: Self = Self{
+        keys_cw : Some(Self::KEYS_D),
+        keys_ccw: Some(Self::KEYS_A),
+    };
+
+    pub const SIDEWAYS_LEFT: Self = Self{
+        keys_cw : Some(Self::KEYS_WA),
+        keys_ccw: Some(Self::KEYS_SA),
+    };
+
+    pub const SIDEWAYS_RIGHT: Self = Self{
+        keys_cw : Some(Self::KEYS_SD),
+        keys_ccw: Some(Self::KEYS_WD),
+    };
 }
 
 pub struct StrafeBot {
