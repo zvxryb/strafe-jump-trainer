@@ -687,6 +687,7 @@ impl Application {
 
     fn update_bot_display(&mut self) {
         self.ui.bot_mode.set_value(match self.strafe_bot {
+            Some(StrafeBot{config: StrafeConfig::PLAYER_KEYS    , ..}) => "player-keys",
             Some(StrafeBot{config: StrafeConfig::STANDARD       , ..}) => "standard",
             Some(StrafeBot{config: StrafeConfig::REVERSE        , ..}) => "reverse",
             Some(StrafeBot{config: StrafeConfig::HALF_BEAT_LEFT , ..}) => "half-beat-left",
@@ -717,6 +718,7 @@ impl Application {
             }
         };
         match self.ui.bot_mode.value().as_str() {
+            "player-keys"    => update_config(&mut self.strafe_bot, StrafeConfig::PLAYER_KEYS),
             "standard"       => update_config(&mut self.strafe_bot, StrafeConfig::STANDARD),
             "reverse"        => update_config(&mut self.strafe_bot, StrafeConfig::REVERSE),
             "half-beat-left" => update_config(&mut self.strafe_bot, StrafeConfig::HALF_BEAT_LEFT),
@@ -724,13 +726,18 @@ impl Application {
             "disabled"       => { self.strafe_bot = None },
             _ => {},
         }
-        if self.strafe_bot.is_some() {
+        if let Some(bot) = &self.strafe_bot {
             self.auto_hop  = self.ui.bot_hop .checked();
-            self.auto_move = self.ui.bot_move.checked();
             self.auto_turn = self.ui.bot_turn.checked();
             self.ui.bot_hop .set_disabled(false);
-            self.ui.bot_move.set_disabled(false);
             self.ui.bot_turn.set_disabled(false);
+            if bot.config == StrafeConfig::PLAYER_KEYS {
+                self.auto_move = false;
+                self.ui.bot_move.set_disabled(true);
+            } else {
+                self.auto_move = self.ui.bot_move.checked();
+                self.ui.bot_move.set_disabled(false);
+            }
             show(&self.ui.keys);
         } else {
             self.auto_hop  = false;
@@ -1283,7 +1290,8 @@ impl Application {
 
         if let Some(strafe_bot) = &mut self.strafe_bot {
             let (keys, theta, phi) = strafe_bot.sim(frame_duration_s,
-                &self.player_state, self.key_state, max_speed, self.input_rotation.0, self.input_rotation.1);
+                &self.player_state, self.input_key_state, max_speed,
+                self.input_rotation.0, self.input_rotation.1);
             self.bot_key_history = self.bot_key_state;
             self.bot_key_state   = keys;
 

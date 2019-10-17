@@ -36,8 +36,8 @@ enum StrafeBotState {
 
 #[derive(Clone, Default, Eq, PartialEq)]
 pub struct StrafeConfig {
-    keys_cw: KeyState,
-    keys_ccw: KeyState,
+    keys_cw: Option<KeyState>,
+    keys_ccw: Option<KeyState>,
 }
 
 impl StrafeConfig {
@@ -75,24 +75,29 @@ impl StrafeConfig {
         ..KEYS_DEFAULT
     };
 
+    pub const PLAYER_KEYS: Self = Self{
+        keys_cw : None,
+        keys_ccw: None,
+    };
+
     pub const STANDARD: Self = Self{
-        keys_cw : Self::KEYS_WD,
-        keys_ccw: Self::KEYS_WA,
+        keys_cw : Some(Self::KEYS_WD),
+        keys_ccw: Some(Self::KEYS_WA),
     };
 
     pub const REVERSE: Self = Self{
-        keys_cw : Self::KEYS_SA,
-        keys_ccw: Self::KEYS_SD,
+        keys_cw : Some(Self::KEYS_SA),
+        keys_ccw: Some(Self::KEYS_SD),
     };
 
     pub const HALF_BEAT_LEFT: Self = Self{
-        keys_cw : Self::KEYS_D,
-        keys_ccw: Self::KEYS_WA,
+        keys_cw : Some(Self::KEYS_D),
+        keys_ccw: Some(Self::KEYS_WA),
     };
 
     pub const HALF_BEAT_RIGHT: Self = Self{
-        keys_cw : Self::KEYS_WD,
-        keys_ccw: Self::KEYS_A,
+        keys_cw : Some(Self::KEYS_WD),
+        keys_ccw: Some(Self::KEYS_A),
     };
 }
 
@@ -129,8 +134,8 @@ impl StrafeBot {
     }
 
     fn strafe_turning(dt: f32,
-        move_angle: Rad<f32>,
-        input_angle: Option<Rad<f32>>,
+        move_dir: Vector2<f32>,
+        wish_dir: Vector2<f32>,
         warp_factor: f32,
         turn_rate: Rad<f32>,
         is_clockwise: bool,
@@ -138,13 +143,15 @@ impl StrafeBot {
         -> Rad<f32>
     {
         if warp_factor > 1.0 {
-            if let Some(input_angle) = input_angle {
+            if wish_dir.magnitude2() > 0.5 {
+                let move_angle = Vector2::unit_y().angle(move_dir);
+                let wish_angle = Vector2::unit_y().angle(wish_dir);
                 let optimal_angle = Rad((1.0 / warp_factor).acos());
                 let mut turn_angle = optimal_angle + turn_rate * dt;
                 if is_clockwise {
                     turn_angle = -turn_angle;
                 }
-                move_angle + turn_angle - input_angle
+                move_angle + turn_angle - wish_angle
             } else {
                 Rad::zero()
             }
@@ -165,12 +172,6 @@ impl StrafeBot {
         let speed = player.vel.xy().magnitude();
         let yaw   = player.dir.0 + add_yaw;
         let pitch = player.dir.1 + add_pitch;
-        let wish_dir = player.wish_dir(keys, add_yaw, add_pitch).xy();
-        let input_angle: Option<Rad<f32>> = if wish_dir.magnitude2() > 0.5 {
-            Some(Vector2::unit_y().angle(wish_dir))
-        } else {
-            None
-        };
         let max_turn: Rad<f32> = (MAX_TURN_RATE * dt).into();
         let (out_keys, turn_yaw) = loop { match &mut self.state {
             StrafeBotState::Setup(duration) => {
@@ -215,8 +216,8 @@ impl StrafeBot {
                     ..Default::default()
                 };
                 let turn_angle = Self::strafe_turning(dt,
-                    Vector2::unit_y().angle(player.vel.xy()),
-                    input_angle,
+                    player.vel.xy(),
+                    player.wish_dir(out_keys, add_yaw, add_pitch).xy(),
                     speed / speed_limit,
                     Rad(10.0),
                     false);
@@ -252,10 +253,10 @@ impl StrafeBot {
                     self.config.keys_cw
                 } else {
                     self.config.keys_ccw
-                });
+                }).unwrap_or(keys);
                 let turn_angle = Self::strafe_turning(dt,
-                    Vector2::unit_y().angle(player.vel.xy()),
-                    input_angle,
+                    player.vel.xy(),
+                    player.wish_dir(out_keys, add_yaw, add_pitch).xy(),
                     speed / speed_limit,
                     Rad(2.0),
                     *is_clockwise);
